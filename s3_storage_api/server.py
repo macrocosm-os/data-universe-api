@@ -4,7 +4,7 @@ import json
 import logging
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 
 import boto3
 from botocore.config import Config
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-
+from aiobotocore.session import get_session
 from s3_storage_api.utils.redis_utils import RedisClient
 from s3_storage_api.utils.bt_utils import verify_signature, verify_validator_status
 from s3_storage_api.utils.metagraph_syncer import MetagraphSyncer
@@ -108,6 +108,15 @@ class ValidatorAccessRequest(BaseModel):
     timestamp: int = Field(default_factory=lambda: int(time.time()))
     expiry: Optional[int] = None
     miner_hotkey: Optional[str] = None
+
+
+class FilePresignedRequest(BaseModel):
+    hotkey: str
+    signature: str  # HEX string
+    timestamp: int = Field(default_factory=lambda: int(time.time()))
+    miner_hotkey: str  # Required: which miner's files to access
+    file_keys: List[str]  # List of specific file keys to generate URLs for
+    expiry_hours: Optional[int] = 1  # Default 1 hour expiry
 
 
 # Lightweight monitoring - just counters
@@ -523,6 +532,163 @@ async def get_folder_presigned_urls(request: ValidatorAccessRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/get-file-presigned-urls")
+async def get_file_presigned_urls(request: FilePresignedRequest):
+    """Generate presigned URLs for individual files using aioboto3 - PER MINER REQUEST"""
+    try:
+        hotkey, timestamp = request.hotkey, request.timestamp
+        signature = request.signature
+        miner_hotkey = request.miner_hotkey
+        file_keys = request.file_keys
+        expiry_hours = request.expiry_hours or 1
+        expiry = timestamp + (expiry_hours * 3600)
+
+        print(f"🔧 [FILE-PRESIGNED] Starting file presigned URLs for miner: {miner_hotkey[:10]}...")
+        print(f"🔧 [FILE-PRESIGNED] Validator: {hotkey[:10]}... requesting {len(file_keys)} files")
+
+        # Rate limiting check
+        is_allowed, msg = check_rate_limit(hotkey, DAILY_LIMIT_PER_VALIDATOR)
+        if not is_allowed:
+            print(f"🔧 [FILE-PRESIGNED] Rate limit failed: {msg}")
+            raise HTTPException(status_code=429, detail=msg)
+
+        # Timestamp validation
+        now = int(time.time())
+        if now > expiry or now - timestamp > 300 or timestamp > now + 60:
+            print(f"🔧 [FILE-PRESIGNED] Timestamp validation failed")
+            raise HTTPException(status_code=400, detail="Invalid timestamp")
+
+        # Commitment for file access
+        commitment = f"s3:validator:files:{miner_hotkey}:{hotkey}:{timestamp}"
+        print(f"🔧 [FILE-PRESIGNED] Commitment: {commitment}")
+
+        # Validator verification
+        print(f"🔧 [FILE-PRESIGNED] Starting validator verification...")
+        validator_status = await verify_validator_status_with_timeout(hotkey, NET_UID, BT_NETWORK)
+        if not validator_status:
+            logger.warning(f"VALIDATOR ACCESS DENIED: {hotkey} - not a validator")
+            print(f"🔧 [FILE-PRESIGNED] Validator verification FAILED")
+            raise HTTPException(status_code=401, detail="You are not validator")
+        print(f"🔧 [FILE-PRESIGNED] Validator verification PASSED")
+
+        # Signature verification
+        print(f"🔧 [FILE-PRESIGNED] Starting signature verification...")
+        signature_valid = await verify_signature_with_timeout(commitment, signature, hotkey, NET_UID, BT_NETWORK)
+        if not signature_valid:
+            logger.warning(f"VALIDATOR SIGNATURE FAILED: {hotkey}")
+            print(f"🔧 [FILE-PRESIGNED] Signature verification FAILED")
+            raise HTTPException(status_code=401, detail="Invalid signature")
+        print(f"🔧 [FILE-PRESIGNED] Signature verification PASSED")
+
+        # Validate that files belong to the specified miner
+        print(f"🔧 [FILE-PRESIGNED] Validating files belong to miner...")
+        miner_prefix = f"data/hotkey={miner_hotkey}/"
+        valid_files = []
+        invalid_files = []
+
+        for file_key in file_keys:
+            if file_key.startswith(miner_prefix):
+                valid_files.append(file_key)
+            else:
+                invalid_files.append(file_key)
+
+        print(f"🔧 [FILE-PRESIGNED] Valid files: {len(valid_files)}, Invalid files: {len(invalid_files)}")
+
+        if len(valid_files) == 0:
+            raise HTTPException(status_code=400, detail="No valid files for specified miner")
+
+        # Generate presigned URLs using aiobotocore (like your example)
+        print(f"🔧 [FILE-PRESIGNED] Generating presigned URLs with aiobotocore...")
+        file_urls = {}
+        failed_files = []
+
+        try:
+
+            session = get_session()
+            async with session.create_client(
+                    's3',
+                    region_name=S3_REGION,
+                    endpoint_url="https://nyc3.digitaloceanspaces.com",
+                    aws_access_key_id=AWS_ACCESS_KEY,
+                    aws_secret_access_key=AWS_SECRET_KEY,
+                    config=Config(
+                        signature_version='s3v4',
+                        max_pool_connections=20
+                    )
+            ) as s3_client:
+
+                for i, file_key in enumerate(valid_files):
+                    try:
+                        print(
+                            f"🔧 [FILE-PRESIGNED] Generating URL {i + 1}/{len(valid_files)}: {file_key.split('/')[-1]}")
+
+                        presigned_url = await s3_client.generate_presigned_url(
+                            ClientMethod='get_object',
+                            Params={
+                                'Bucket': S3_BUCKET,
+                                'Key': file_key
+                            },
+                            ExpiresIn=expiry_hours * 3600
+                        )
+
+                        file_urls[file_key] = {
+                            'presigned_url': presigned_url,
+                            'file_key': file_key,
+                            'expires_in_seconds': expiry_hours * 3600,
+                            'file_name': file_key.split('/')[-1]
+                        }
+
+                    except Exception as file_error:
+                        logger.error(f"Failed to generate presigned URL for {file_key}: {str(file_error)}")
+                        print(f"🔧 [FILE-PRESIGNED] ERROR generating URL for {file_key}: {str(file_error)}")
+                        failed_files.append({
+                            'file_key': file_key,
+                            'error': str(file_error)
+                        })
+
+            print(f"🔧 [FILE-PRESIGNED] Successfully generated {len(file_urls)} presigned URLs")
+
+            return {
+                'validator_hotkey': hotkey,
+                'miner_hotkey': miner_hotkey,
+                'bucket': S3_BUCKET,
+                'expiry_hours': expiry_hours,
+                'expiry_time': datetime.fromtimestamp(timestamp + (expiry_hours * 3600)).isoformat(),
+                'total_requested_files': len(file_keys),
+                'valid_files_count': len(valid_files),
+                'invalid_files_count': len(invalid_files),
+                'successful_urls': len(file_urls),
+                'failed_files': len(failed_files),
+                'file_urls': file_urls,
+                'invalid_files': invalid_files,
+                'failed_files_details': failed_files,
+                'commitment_used': commitment,
+                'usage_info': {
+                    'description': 'Use presigned URLs to download individual files for content validation',
+                    'miner_validation_flow': [
+                        '1. Get list of files for miner using /get-folder-presigned-urls',
+                        '2. Select specific files to validate',
+                        '3. Request presigned URLs for those files using this endpoint',
+                        '4. Download files using presigned URLs',
+                        '5. Analyze parquet content with pandas/DuckDB'
+                    ]
+                }
+            }
+
+        except Exception as s3_error:
+            logger.error(f"aioboto3 S3 error: {str(s3_error)}")
+            print(f"🔧 [FILE-PRESIGNED] S3 ERROR: {str(s3_error)}")
+            raise HTTPException(status_code=500, detail=f"S3 presigned URL generation failed: {str(s3_error)}")
+
+    except HTTPException:
+        print(f"🔧 [FILE-PRESIGNED] HTTP Exception raised")
+        raise
+    except Exception as e:
+        logger.error(f"File presigned URLs error: {str(e)}")
+        print(f"🔧 [FILE-PRESIGNED] UNEXPECTED ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/get-miner-specific-access")
 async def get_miner_specific_access(request: ValidatorAccessRequest):
     """Get presigned URL for a specific miner's data with 2-minute timeout protection"""
@@ -679,10 +845,12 @@ async def commitment_formats():
         'validator_format': "s3:validator:access:{timestamp}",
         'miner_specific_format': "s3:validator:miner:{miner_hotkey}:{timestamp}",
         'folder_presigned_format': "s3:validator:folders:{hotkey}:{timestamp}",
+        'file_presigned_format': "s3:validator:files:{miner_hotkey}:{hotkey}:{timestamp}",
         'example_miner': "s3:data:access:5F3...coldkey:5H2...hotkey:1682345678",
         'example_validator': "s3:validator:access:1682345678",
         'example_miner_specific': "s3:validator:miner:5F3...miner_hotkey:1682345678",
         'example_folder_presigned': "s3:validator:folders:5F3...validator_hotkey:1682345678",
+        'example_file_presigned': "s3:validator:files:5F3...miner_hotkey:5F3...validator_hotkey:1682345678",
         'folder_structure': {
             'new_structure': 'data/hotkey={hotkey_id}/job_id={job_id}/',
             'description': 'Job-based folder structure with explicit labels under data/ prefix',
