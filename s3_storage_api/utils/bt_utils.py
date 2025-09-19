@@ -88,7 +88,7 @@ def verify_validator_status(hotkey: str, netuid: int, network: str) -> bool:
         # Get metagraph to check validator permit
         metagraph = subtensor.metagraph(netuid=netuid)
         validator_permit = bool(metagraph.validator_permit[uid])
-        stake = int(metagraph.alpha_stake[uid]) > 20_000
+        stake = int(metagraph.alpha_stake[uid]) > 10_000
         if validator_permit and stake:
             return True
         

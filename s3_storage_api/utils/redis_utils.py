@@ -1,28 +1,34 @@
 """
-Redis utility functions for caching and rate limiting
+Redis utility functions with memory leak fixes
 """
 import os
 import redis
+import time
 from typing import Dict, Any, Optional
+from collections import OrderedDict
 
 
 class RedisClient:
     """Client for Redis operations with fallback to in-memory cache"""
 
-    def __init__(self, redis_url: str = None):
+    def __init__(self, redis_url: str = None, max_cache_size: int = 10000):
         """
         Initialize Redis client with fallback
 
         Args:
             redis_url: Redis connection URL
+            max_cache_size: Maximum number of items in in-memory cache
         """
         self.redis_url = redis_url or os.getenv('REDIS_URL', 'redis://localhost:6379/0')
         self.connected = False
         self.client = None
+        self.max_cache_size = max_cache_size
 
-        # In-memory fallback
-        self.cache = {}
-        self.counters = {}
+        # In-memory fallback with LRU eviction and TTL
+        self.cache = OrderedDict()  # For LRU eviction
+        self.cache_ttl = {}  # Track expiry times
+        self.counters = OrderedDict()  # For LRU eviction
+        self.counter_ttl = {}  # Track expiry times
 
         # Try to connect
         self._connect()
@@ -38,6 +44,21 @@ class RedisClient:
             print(f"Redis connection failed: {str(e)}. Using in-memory fallback.")
             self.connected = False
 
+    def _cleanup_expired(self, cache_dict: OrderedDict, ttl_dict: Dict):
+        """Remove expired items from cache"""
+        current_time = time.time()
+        expired_keys = [k for k, expiry in ttl_dict.items() if expiry < current_time]
+        for key in expired_keys:
+            cache_dict.pop(key, None)
+            ttl_dict.pop(key, None)
+
+    def _evict_lru(self, cache_dict: OrderedDict, ttl_dict: Dict):
+        """Evict oldest items if cache is full"""
+        while len(cache_dict) >= self.max_cache_size:
+            oldest_key = next(iter(cache_dict))
+            cache_dict.pop(oldest_key, None)
+            ttl_dict.pop(oldest_key, None)
+
     def get(self, key: str) -> Optional[str]:
         """Get a value from Redis with in-memory fallback"""
         if self.connected:
@@ -46,8 +67,15 @@ class RedisClient:
             except Exception:
                 print("Redis get failed, using in-memory fallback")
 
-        # In-memory fallback
-        return self.cache.get(key)
+        # In-memory fallback with TTL check
+        self._cleanup_expired(self.cache, self.cache_ttl)
+        
+        if key in self.cache:
+            # Move to end (most recently used)
+            self.cache.move_to_end(key)
+            return self.cache[key]
+        
+        return None
 
     def set(self, key: str, value: str, expire: int = None):
         """Set a value in Redis with in-memory fallback"""
@@ -61,8 +89,13 @@ class RedisClient:
             except Exception:
                 print("Redis set failed, using in-memory fallback")
 
-        # In-memory fallback
+        # In-memory fallback with size limits
+        self._cleanup_expired(self.cache, self.cache_ttl)
+        self._evict_lru(self.cache, self.cache_ttl)
+        
         self.cache[key] = value
+        if expire:
+            self.cache_ttl[key] = time.time() + expire
 
     def delete(self, key: str):
         """Delete a key from Redis with in-memory fallback"""
@@ -74,8 +107,8 @@ class RedisClient:
                 print("Redis delete failed, using in-memory fallback")
 
         # In-memory fallback
-        if key in self.cache:
-            del self.cache[key]
+        self.cache.pop(key, None)
+        self.cache_ttl.pop(key, None)
 
     def get_counter(self, key: str) -> int:
         """Get a counter value with in-memory fallback"""
@@ -86,8 +119,15 @@ class RedisClient:
             except Exception:
                 print("Redis get_counter failed, using in-memory fallback")
 
-        # In-memory fallback
-        return self.counters.get(key, 0)
+        # In-memory fallback with TTL check
+        self._cleanup_expired(self.counters, self.counter_ttl)
+        
+        if key in self.counters:
+            # Move to end (most recently used)
+            self.counters.move_to_end(key)
+            return self.counters[key]
+        
+        return 0
 
     def increment_counter(self, key: str, expire: int = 86400) -> int:
         """Increment a counter with in-memory fallback"""
@@ -95,45 +135,35 @@ class RedisClient:
             try:
                 value = self.client.incr(key)
                 # Set expiry if not already set
-                if expire and not self.client.ttl(key):
+                if expire and self.client.ttl(key) == -1:
                     self.client.expire(key, expire)
                 return value
             except Exception:
                 print("Redis increment_counter failed, using in-memory fallback")
 
-        # In-memory fallback
-        self.counters[key] = self.counters.get(key, 0) + 1
+        # In-memory fallback with size limits
+        self._cleanup_expired(self.counters, self.counter_ttl)
+        self._evict_lru(self.counters, self.counter_ttl)
+        
+        current_value = self.counters.get(key, 0)
+        self.counters[key] = current_value + 1
+        
+        # Set TTL for counter
+        if expire:
+            self.counter_ttl[key] = time.time() + expire
+            
         return self.counters[key]
 
-    def cache_check(self, cache_key: str, check_func, *args, expire: int = 60, **kwargs) -> Any:
-        """
-        Check cache before calling a function
+    def cleanup(self):
+        """Manual cleanup method to remove expired items"""
+        self._cleanup_expired(self.cache, self.cache_ttl)
+        self._cleanup_expired(self.counters, self.counter_ttl)
 
-        Args:
-            cache_key: Key to use for caching
-            check_func: Function to call if not cached
-            args, kwargs: Arguments to pass to check_func
-            expire: Cache expiry time in seconds
-
-        Returns:
-            Result from cache or function call
-        """
-        # Check cache first
-        cached = self.get(cache_key)
-        if cached:
-            if cached == b'1' or cached == '1':
-                return True
-            elif cached == b'0' or cached == '0':
-                return False
-            return cached
-
-        # Call function and cache result
-        result = check_func(*args, **kwargs)
-
-        # Cache the result
-        if isinstance(result, bool):
-            self.set(cache_key, '1' if result else '0', expire)
-        else:
-            self.set(cache_key, str(result), expire)
-
-        return result
+    def get_cache_stats(self):
+        """Get cache statistics for monitoring"""
+        return {
+            'cache_size': len(self.cache),
+            'cache_max_size': self.max_cache_size,
+            'counters_size': len(self.counters),
+            'connected_to_redis': self.connected
+        }
