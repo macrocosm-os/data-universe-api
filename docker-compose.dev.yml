@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: s3api-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user            
+      POSTGRES_PASSWORD: pass        
+      POSTGRES_DB: mydb              
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: s3api-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - redisdata:/data
+
+  minio:
+    image: quay.io/minio/minio
+    container_name: s3api-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${DO_SPACES_KEY:-aws_access_key}
+      MINIO_ROOT_PASSWORD: ${DO_SPACES_SECRET:-aws_secret_key}
+      MINIO_REGION_NAME: ${S3_REGION:-nyc3}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"    # now serves HTTPS
+      - "9001:9001"    # console HTTPS
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    volumes:
+      - miniodata:/data
+      - ./certs/public.crt:/root/.minio/certs/public.crt:ro
+      - ./certs/private.key:/root/.minio/certs/private.key:ro
+
+  # Create bucket on startup
+  minio-mc:
+    image: minio/mc:latest
+    container_name: s3api-minio-mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      set -euo pipefail;
+      mc alias set --insecure local https://minio:9000 ${DO_SPACES_KEY:-aws_access_key} ${DO_SPACES_SECRET:-aws_secret_key};
+      mc mb --ignore-existing local/${S3_BUCKET:-data-universe-storage};
+      echo 'Bucket ensured';
+      "
+    restart: "no"
+
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

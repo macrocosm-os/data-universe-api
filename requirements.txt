@@ -9,3 +9,9 @@ pydantic>=2.0.0
 bittensor==9.0.0
 dotenv
 redis
+pydantic
+pydantic_settings
+substrate-interface
+cachetools
+sqlalchemy
+aioboto3

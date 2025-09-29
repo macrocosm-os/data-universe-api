@@ -137,3 +137,26 @@ The recommended migration strategy:
 - Monitor for unusual access patterns
 - Regularly rotate AWS credentials
 - Use the smallest set of S3 permissions needed
+
+## Local Development & Testing
+
+Boot up the test containers:
+```
+docker compose --env-file .test.env -f docker-compose.dev.yml up
+```
+
+Tear them down (optional remove volumes with -v)
+```
+docker compose -f docker-compose.dev.yml down -v
+```
+
+Run tests
+
+```
+pip install -r requirements-dev.txt
+export PYTHONPATH=$(pwd)
+
+pytest tests/ -s
+```
+
+For migrations, there's alembic.
