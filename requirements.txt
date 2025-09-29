@@ -15,3 +15,4 @@ substrate-interface
 cachetools
 sqlalchemy
 alembic
+aiobotocore
