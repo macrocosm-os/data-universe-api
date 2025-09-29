@@ -14,4 +14,4 @@ pydantic_settings
 substrate-interface
 cachetools
 sqlalchemy
-aioboto3
+alembic

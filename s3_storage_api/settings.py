@@ -34,8 +34,8 @@ class ApiSettings(BaseSettings):
     aws_access_key: str = Field(default="aws_access_key", alias="DO_SPACES_KEY")
     aws_secret_key: str = Field(default="aws_secret_key", alias="DO_SPACES_SECRET")
 
-    api_host: str = "0.0.0.0"
-    api_port: int = 8051
+    api_host: str = Field("0.0.0.0", alias='HOST')
+    api_port: int = Field(8051, alias='PORT')
 
     postgres_dsn: str = "postgresql+asyncpg://user:pass@localhost:5432/mydb"
 

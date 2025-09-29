@@ -1,0 +1,85 @@
+name: Docker Build and Publish
+
+on:
+  push:
+    branches: [ main, dev ]
+    tags:
+      - 'v*'        # e.g. v1.2.3 will produce a semver tag
+  workflow_dispatch:
+
+# Needed for GHCR pushes with GITHUB_TOKEN
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # Set these in repo Settings → Secrets and variables → Actions (or override at runtime)
+  REGISTRY: ${{ secrets.REGISTRY }}          # e.g. "docker.io" or "ghcr.io"
+  IMAGE_NAME: ${{ secrets.IMAGE_NAME }}      # e.g. "youruser/yourapp" or "OWNER/REPO"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for multi-arch)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ---- LOGIN (choose automatically based on REGISTRY) ----
+      # If pushing to GHCR and you haven't provided explicit credentials,
+      # we'll use the built-in GITHUB_TOKEN (requires packages:write permission).
+      - name: Log in to GHCR with GITHUB_TOKEN
+        if: env.REGISTRY == 'ghcr.io' && !secrets.REGISTRY_USERNAME && !secrets.REGISTRY_PASSWORD
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to registry with credentials
+        if: secrets.REGISTRY_USERNAME && secrets.REGISTRY_PASSWORD
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Show pushed tags
+        run: |
+          echo "Pushed image tags:"
+          echo "${{ steps.meta.outputs.tags }}" | tr ' ' '\n'
