@@ -59,6 +59,7 @@ jobs:
 
       - name: Perform migrations
         run: |
+          export POSTGRES_DSN=postgresql+asyncpg://user:pass@localhost:5432/mydb
           alembic upgrade head
 
       - name: Run pytest
