@@ -90,7 +90,7 @@ async def miner_job_submit(
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS)
 
     req.submission.miner_hotkey = auth.miner_hotkey
-    req.submission.miner_vtrust = auth.miner_vtrust
+    req.submission.miner_incentive = auth.miner_incentive
     req.submission.submitted_at = datetime.now(timezone.utc)
 
     job_maybe = await svc.get_job(job_id=req.submission.job_id)

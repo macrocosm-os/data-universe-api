@@ -1,8 +1,8 @@
-"""initial schema
+"""create initial tables
 
-Revision ID: 05e77461b0e6
+Revision ID: 132921ddc96e
 Revises: 
-Create Date: 2025-09-29 17:18:25.860662
+Create Date: 2025-09-30 17:04:45.052799
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '05e77461b0e6'
+revision: str = '132921ddc96e'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -33,14 +33,14 @@ def upgrade() -> None:
     sa.Column('payload', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('ix_on_demand_jobs_created_at', 'on_demand_jobs', ['created_at'], unique=False)
+    op.create_index(op.f('ix_on_demand_jobs_created_at'), 'on_demand_jobs', ['created_at'], unique=False)
     op.create_index(op.f('ix_on_demand_jobs_expire_at'), 'on_demand_jobs', ['expire_at'], unique=False)
-    op.create_index(op.f('ix_on_demand_jobs_platform'), 'on_demand_jobs', ['platform'], unique=False)
+    op.create_index('ix_on_demand_jobs_platform', 'on_demand_jobs', ['platform'], unique=False)
     op.create_table('on_demand_job_submissions',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('job_id', sa.String(length=64), nullable=False),
     sa.Column('miner_hotkey', sa.String(length=256), nullable=False),
-    sa.Column('miner_vtrust', sa.Float(), nullable=False),
+    sa.Column('miner_incentive', sa.Float(), nullable=False),
     sa.Column('submitted_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('s3_path', sa.String(length=1024), nullable=True),
     sa.ForeignKeyConstraint(['job_id'], ['on_demand_jobs.id'], ondelete='CASCADE'),
@@ -60,8 +60,8 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_on_demand_job_submissions_submitted_at'), table_name='on_demand_job_submissions')
     op.drop_index(op.f('ix_on_demand_job_submissions_job_id'), table_name='on_demand_job_submissions')
     op.drop_table('on_demand_job_submissions')
-    op.drop_index(op.f('ix_on_demand_jobs_platform'), table_name='on_demand_jobs')
+    op.drop_index('ix_on_demand_jobs_platform', table_name='on_demand_jobs')
     op.drop_index(op.f('ix_on_demand_jobs_expire_at'), table_name='on_demand_jobs')
-    op.drop_index('ix_on_demand_jobs_created_at', table_name='on_demand_jobs')
+    op.drop_index(op.f('ix_on_demand_jobs_created_at'), table_name='on_demand_jobs')
     op.drop_table('on_demand_jobs')
     # ### end Alembic commands ###

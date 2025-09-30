@@ -16,3 +16,4 @@ cachetools
 sqlalchemy
 alembic
 aiobotocore
+asyncpg

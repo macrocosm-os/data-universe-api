@@ -28,7 +28,7 @@ async def verify_constellation(x_api_key: str = Header(..., alias="X-API-Key")):
 class BittensorMinerAuth(BaseModel):
     miner_hotkey: str
     miner_uid: int
-    miner_vtrust: float
+    miner_incentive: float
 
 
 class BittensorValidatorAuth(BaseModel):
@@ -111,7 +111,7 @@ async def verify_bittensor_miner(
 
     # success: return metadata for downstream handlers if needed
     return BittensorMinerAuth(
-        miner_hotkey=x_signed_by, miner_uid=uid, miner_vtrust=incentive
+        miner_hotkey=x_signed_by, miner_uid=uid, miner_incentive=incentive
     )
 
 

@@ -57,7 +57,7 @@ class OnDemandSubmissionORM(Base):
     )
 
     miner_hotkey: Mapped[str] = mapped_column(String(256), nullable=False)
-    miner_vtrust: Mapped[float] = mapped_column()
+    miner_incentive: Mapped[float] = mapped_column()
 
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True

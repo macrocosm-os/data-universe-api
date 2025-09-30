@@ -75,7 +75,7 @@ def orm_on_demand_submission_to_domain(
     return OnDemandJobSubmission.model_construct(
         job_id=orm.job_id,
         miner_hotkey=orm.miner_hotkey,
-        miner_vtrust=orm.miner_vtrust,
+        miner_incentive=orm.miner_incentive,
         submitted_at=orm.submitted_at,
         s3_path=orm.s3_path,
         s3_presigned_url=presigned_url,
@@ -176,7 +176,7 @@ class OnDemandSubmissionRepository:
         obj = OnDemandSubmissionORM(
             job_id=submission.job_id,
             miner_hotkey=submission.miner_hotkey,
-            miner_vtrust=submission.miner_vtrust,
+            miner_incentive=submission.miner_incentive,
             submitted_at=submission.submitted_at,
             s3_path=s3_path,
         )
