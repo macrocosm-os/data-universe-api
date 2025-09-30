@@ -18,14 +18,14 @@ patches:
     patch: |-
       - op: replace
         path: /data/VERSION
-        value: sha-0d8dd4d
+        value: sha-c68e61d
 
 
 commonAnnotations:
-  git-version: sha-0d8dd4d
+  git-version: sha-c68e61d
   concourse.ci/pipeline: data-universe-api
   concourse.ci/job: deploy-service-branch-main
 
 images:
-  - name: ghcr.io/macrocosm-os/data-universe-api:branch-main
-    newTag: sha-0d8dd4d
+  - name: ghcr.io/macrocosm-os/macrocosm-os/data-universe-api:branch-main
+    newTag: sha-c68e61d
