@@ -77,7 +77,7 @@ jobs:
               - |
                 set -e
                 cd service_repo
-                git rev-parse --short=8 HEAD > ../git-version/git_version
+                git rev-parse --short=7 HEAD > ../git-version/git_version
       
       - put: deployment-notification-stage
         params:
@@ -103,7 +103,6 @@ jobs:
         text: |
           :white_check_mark: *((SERVICE))* service deployed successfully for version `$TEXT_FILE_CONTENT` in *stage*
     plan:
-      # - get: macrocosmos-platform
       - get: concourse
       - put: metadata
 
@@ -145,7 +144,7 @@ jobs:
 
                 echo "[*] Fetching main revision"
                 cd service_repo
-                GIT_HASH=`git rev-parse --short=8 HEAD`
+                GIT_HASH=`git rev-parse --short=7 HEAD`
                 echo "[+] Found revision ${GIT_HASH}"
                 echo "${GIT_HASH}" > ../git-version/git_version
                 
@@ -165,7 +164,7 @@ jobs:
                 echo ""
 
                 kubectl apply -f stack.yaml
-                # kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
+                kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
       
   - name: start-deploy-prod
     plan:
@@ -187,7 +186,7 @@ jobs:
               - |
                 set -e
                 cd service_repo
-                git rev-parse --short=8 HEAD > ../git-version/git_version
+                git rev-parse --short=7 HEAD > ../git-version/git_version
       
       - put: deployment-notification-prod
         params:
@@ -213,7 +212,6 @@ jobs:
         text: |
           :white_check_mark: *((SERVICE))* service deployed successfully for version `$TEXT_FILE_CONTENT` in *prod*
     plan:
-      # - get: macrocosmos-platform
       - get: concourse
 
       - get: service_repo_prod
@@ -250,7 +248,7 @@ jobs:
 
                 echo "[*] Fetching main revision"
                 cd service_repo
-                GIT_HASH=`git rev-parse --short=8 HEAD`
+                GIT_HASH=`git rev-parse --short=7 HEAD`
                 echo "[+] Found revision ${GIT_HASH}"
                 echo "${GIT_HASH}" > ../git-version/git_version
                 
