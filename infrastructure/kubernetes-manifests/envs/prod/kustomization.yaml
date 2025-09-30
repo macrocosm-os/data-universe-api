@@ -28,11 +28,6 @@ patches:
 commonLabels:
   app: data-universe-api
 
-commonAnnotations:
-  git-version: sha-NEWTAGREPLACEME
-  concourse.ci/pipeline: data-universe-api
-  concourse.ci/job: deploy-service-prod
-
 images:
   - name: ghcr.io/macrocosm-os/data-universe-api:branch-main
     newTag: sha-NEWTAGREPLACEME
