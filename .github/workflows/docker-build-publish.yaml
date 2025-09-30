@@ -58,6 +58,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Inspect pushed image
+        run: |
+          first_tag=$(echo "${{ steps.meta.outputs.tags }}" | awk '{print $1}')
+          echo "Inspecting: $first_tag"
+          docker buildx imagetools inspect "$first_tag"
+
       - name: Show pushed tags
         run: |
           echo "Pushed image tags:"
