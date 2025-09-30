@@ -1,0 +1,7 @@
+---
+# Role for the data-universe-api jobs that are dynamically created.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: data-universe-api
+  namespace: kustomize-me

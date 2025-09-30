@@ -1,0 +1,16 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  default:
+    - task --list-all
+  
+  kustomize:
+    cmds:
+      - kustomize build envs/branch-main -o branch-main.yaml
+  
+  lint:
+    cmds:
+      - task kustomize
+      - kube-linter lint branch-main.yaml

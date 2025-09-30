@@ -1,0 +1,15 @@
+---
+# binds the SA and CR for the data-universe-api deployment
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: data-universe-api
+  namespace: kustomize-me
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: data-universe-api
+subjects:
+- kind: ServiceAccount
+  name: data-universe-api
+  namespace: kustomize-me

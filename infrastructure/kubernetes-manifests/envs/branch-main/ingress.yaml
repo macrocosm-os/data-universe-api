@@ -1,0 +1,19 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: data-universe-api
+  namespace: kustomize-me
+spec:
+  ingressClassName: nginx-api
+  rules:
+    - host: data-universe-api-branch-main.api.macrocosmos.ai
+      http:
+        paths:
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: data-universe-api
+                port:
+                  number: 8000
