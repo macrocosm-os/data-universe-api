@@ -21,12 +21,22 @@ resources:
     source:
       url: ((slack_webhook_prod))
 
-  - name: service_repo
+  - name: service_repo_prod
     type: git
     check_every: 10m
     source:
       uri: https://github.com/macrocosm-os/data-universe-api.git
       branch: main
+      depth: 1
+      username: ((ghcr_username))
+      password: ((ghcr_token))
+
+  - name: service_repo_stage
+    type: git
+    check_every: 10m
+    source:
+      uri: https://github.com/macrocosm-os/data-universe-api.git
+      branch: on-demand/scalable
       depth: 1
       username: ((ghcr_username))
       password: ((ghcr_token))
@@ -47,11 +57,13 @@ jobs:
   - name: start-deploy-stage
     plan:
       - get: concourse
-      - get: service_repo
+      - get: service_repo_stage
         # trigger: true
       
       - task: get-version 
         image: concourse
+        input_mapping:
+          service_repo: service_repo_stage
         config:
           platform: linux
           inputs:
@@ -95,7 +107,7 @@ jobs:
       - get: concourse
       - put: metadata
 
-      - get: service_repo
+      - get: service_repo_stage
         trigger: true
         passed:
           - start-deploy-stage
@@ -103,8 +115,7 @@ jobs:
       - task: deploy-service-stage
         image: concourse
         input_mapping:
-          # # macrocosmos-platform: macrocosmos-platform
-          service_repo: service_repo
+          service_repo: service_repo_stage
           metadata: metadata
         config:
           platform: linux
@@ -112,7 +123,6 @@ jobs:
             KBCTLCFG: ((kubeconfig))
             ENV_DIR: branch-main
           inputs:
-            # - name: macrocosmos-platform
             - name: service_repo
             - name: metadata
           outputs:
@@ -160,9 +170,8 @@ jobs:
   - name: start-deploy-prod
     plan:
       - get: concourse
-      - get: service_repo
+      - get: service_repo_prod
         trigger: false
-      
       - task: get-version 
         image: concourse
         config:
@@ -207,7 +216,7 @@ jobs:
       # - get: macrocosmos-platform
       - get: concourse
 
-      - get: service_repo
+      - get: service_repo_prod
         trigger: true
         passed:
           - start-deploy-prod
@@ -215,15 +224,13 @@ jobs:
       - task: deploy-service-prod
         image: concourse
         input_mapping:
-          # macrocosmos-platform: macrocosmos-platform
-          service_repo: service_repo
+          service_repo: service_repo_prod
         config:
           platform: linux
           params:
             KBCTLCFG: ((kubeconfig))
             ENV_DIR: prod
           inputs:
-            # - name: macrocosmos-platform
             - name: service_repo
           outputs:
             - name: git-version
