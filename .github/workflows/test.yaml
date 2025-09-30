@@ -57,6 +57,10 @@ jobs:
           done
           docker compose -f docker-compose.dev.yml ps
 
+      - name: Perform migrations
+        run: |
+          alembic upgrade head
+
       - name: Run pytest
         run: |
           pytest tests/ -s
