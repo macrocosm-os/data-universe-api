@@ -7,7 +7,6 @@ on:
       - 'v*'        # e.g. v1.2.3 will produce a semver tag
   workflow_dispatch:
 
-# Needed for GHCR pushes with GH_TOKEN
 permissions:
   contents: read
   packages: write
@@ -24,9 +23,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ---- LOGIN (choose automatically based on REGISTRY) ----
-      # If pushing to GHCR and you haven't provided explicit credentials,
-      # we'll use the built-in GH_TOKEN (requires packages:write permission).
       - name: Log in to GHCR with GH_TOKEN
         uses: docker/login-action@v3
         with:
