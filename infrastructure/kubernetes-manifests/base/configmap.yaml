@@ -1,0 +1,8 @@
+apiVersion: v1
+data:
+  DUMMY: DUMMY
+  VERSION: REPLACEME
+kind: ConfigMap
+metadata:
+  name: config
+  namespace: kustomize-me

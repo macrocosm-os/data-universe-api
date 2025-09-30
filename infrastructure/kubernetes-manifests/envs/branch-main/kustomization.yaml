@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# update the namespace
+namespace: macrocosmos-sn13-data-universe-api-branch-main
+
+# include base resources
+resources:
+  - ../../base
+  - ingress.yaml
+
+patches:
+  - target:
+      version: v1
+      kind: ConfigMap
+      name: config
+    patch: |-
+      - op: replace
+        path: /data/VERSION
+        value: sha-4e5c7d1
+
+
+commonAnnotations:
+  git-version: sha-4e5c7d1
+  concourse.ci/pipeline: data-universe-api
+  concourse.ci/job: deploy-service-branch-main
+
+images:
+  - name: ghcr.io/macrocosm-os/data-universe-api:branch-main
+    newTag: sha-4e5c7d1

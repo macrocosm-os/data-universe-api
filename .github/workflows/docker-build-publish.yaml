@@ -2,20 +2,14 @@ name: Docker Build and Publish
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, dev, on-demand/scalable ]
     tags:
       - 'v*'        # e.g. v1.2.3 will produce a semver tag
   workflow_dispatch:
 
-# Needed for GHCR pushes with GITHUB_TOKEN
 permissions:
   contents: read
   packages: write
-
-env:
-  # Set these in repo Settings → Secrets and variables → Actions (or override at runtime)
-  REGISTRY: ${{ secrets.REGISTRY }}          # e.g. "docker.io" or "ghcr.io"
-  IMAGE_NAME: ${{ secrets.IMAGE_NAME }}      # e.g. "youruser/yourapp" or "OWNER/REPO"
 
 jobs:
   build-and-push:
@@ -26,37 +20,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (for multi-arch)
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ---- LOGIN (choose automatically based on REGISTRY) ----
-      # If pushing to GHCR and you haven't provided explicit credentials,
-      # we'll use the built-in GITHUB_TOKEN (requires packages:write permission).
-      - name: Log in to GHCR with GITHUB_TOKEN
-        if: env.REGISTRY == 'ghcr.io' && !secrets.REGISTRY_USERNAME && !secrets.REGISTRY_PASSWORD
+      - name: Log in to GHCR with GH_TOKEN
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to registry with credentials
-        if: secrets.REGISTRY_USERNAME && secrets.REGISTRY_PASSWORD
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ghcr.io/${{ github.repository_owner }}/${{ vars.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -73,11 +52,22 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Inspect pushed image
+        run: |
+          set -euo pipefail
+          first_tag=$(printf "%s\n" "${{ steps.meta.outputs.tags }}" | tr ' ' '\n' | sed '/^$/d' | head -n1)
+          echo "Inspecting: $first_tag"
+          if [ -z "$first_tag" ]; then
+          echo "No tag resolved from metadata-action"
+          exit 1
+          fi
+          docker buildx imagetools inspect "$first_tag"
 
       - name: Show pushed tags
         run: |
