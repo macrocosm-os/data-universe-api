@@ -60,8 +60,13 @@ jobs:
 
       - name: Inspect pushed image
         run: |
-          first_tag=$(echo "${{ steps.meta.outputs.tags }}" | awk '{print $1}')
+          set -euo pipefail
+          first_tag=$(printf "%s\n" "${{ steps.meta.outputs.tags }}" | tr ' ' '\n' | sed '/^$/d' | head -n1)
           echo "Inspecting: $first_tag"
+          if [ -z "$first_tag" ]; then
+          echo "No tag resolved from metadata-action"
+          exit 1
+          fi
           docker buildx imagetools inspect "$first_tag"
 
       - name: Show pushed tags
