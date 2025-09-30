@@ -12,7 +12,7 @@ metadata:
   namespace: kustomize-me
 spec:
   revisionHistoryLimit: 1
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: data-universe-api
@@ -37,6 +37,8 @@ spec:
         envFrom:
           - configMapRef:
               name: config
+          - secretRef:
+              name: secrets
         env:
           - name: SERVICE
             value: data-universe-api
