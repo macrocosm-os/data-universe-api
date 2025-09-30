@@ -8,6 +8,7 @@ namespace: macrocosmos-sn13-data-universe-api-branch-main
 resources:
   - ../../base
   - ingress.yaml
+  - external-secret.yaml
 
 patches:
   - target:
@@ -17,14 +18,14 @@ patches:
     patch: |-
       - op: replace
         path: /data/VERSION
-        value: sha-4e5c7d1
+        value: sha-0d8dd4d
 
 
 commonAnnotations:
-  git-version: sha-4e5c7d1
+  git-version: sha-0d8dd4d
   concourse.ci/pipeline: data-universe-api
   concourse.ci/job: deploy-service-branch-main
 
 images:
   - name: ghcr.io/macrocosm-os/data-universe-api:branch-main
-    newTag: sha-4e5c7d1
+    newTag: sha-0d8dd4d

@@ -8,6 +8,7 @@ namespace: macrocosmos-sn13-data-universe-api-prod
 resources:
   - ../../base
   - ingress.yaml
+  - external-secret.yaml
 
 # patch namespaces etc
 patches:
