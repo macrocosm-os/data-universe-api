@@ -165,7 +165,7 @@ jobs:
                 echo ""
 
                 kubectl apply -f stack.yaml
-                kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
+                # kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
       
   - name: start-deploy-prod
     plan:
@@ -270,7 +270,7 @@ jobs:
                 echo ""
 
                 kubectl apply -f stack.yaml
-                kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
+                # kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
 
 groups:
   - name: ((SERVICE))
