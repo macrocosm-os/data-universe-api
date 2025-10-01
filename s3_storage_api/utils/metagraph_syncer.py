@@ -7,6 +7,8 @@ from typing import Dict, List, Callable, Optional
 import threading
 import traceback
 
+import structlog
+logger = structlog.get_logger(__name__)
 
 class MetagraphSyncer:
     @dataclasses.dataclass
@@ -31,27 +33,27 @@ class MetagraphSyncer:
         self.done_initial_sync = False
         self.lock = threading.RLock()
 
-        print(f"MetagraphSyncer created with config: {config}")
+        logger.info(f"MetagraphSyncer created with config: {config}")
 
     def do_initial_sync(self):
         """Performs an initial sync of all metagraphs.
 
         Unlike regular syncs, this will not notify listeners of the updated metagraph.
         """
-        print("Metagraph syncer do_initial_sync called")
+        logger.info("Metagraph syncer do_initial_sync called")
 
         for netuid in self.config.keys():
             try:
-                print(f"Initial sync for netuid {netuid}...")
+                logger.info(f"Initial sync for netuid {netuid}...")
                 metagraph = self.subtensor.metagraph(netuid)
                 with self.lock:
                     state = self.metagraph_map[netuid]
                     state.metagraph = metagraph
                     state.last_synced_time = datetime.now()
 
-                print(f"Successfully loaded metagraph for {netuid}")
+                logger.info(f"Successfully loaded metagraph for {netuid}")
             except Exception as e:
-                print(f"Error in initial sync for netuid {netuid}: {str(e)}")
+                logger.exception(f"Error in initial sync for netuid {netuid}: {str(e)}")
                 raise
 
         self.done_initial_sync = True
@@ -60,7 +62,7 @@ class MetagraphSyncer:
         return self.done_initial_sync
 
     def start(self):
-        print("Metagraph syncer start called")
+        logger.info("Metagraph syncer start called")
 
         assert self.done_initial_sync, "Must call do_initial_sync before starting"
 
@@ -71,14 +73,14 @@ class MetagraphSyncer:
     async def _sync_metagraph_loop(self, netuid: int, cadence: int):
         while self.is_running:
             # On start, wait cadence before the first sync.
-            print(f"Syncing metagraph for {netuid} in {cadence} seconds.")
+            await logger.ainfo(f"Syncing metagraph for {netuid} in {cadence} seconds.")
             await asyncio.sleep(cadence)
 
             try:
                 # Sync metagraph
-                print(f"Syncing metagraph for {netuid}.")
+                await logger.ainfo(f"Syncing metagraph for {netuid}.")
                 metagraph = self.subtensor.metagraph(netuid)
-                print(f"Successfully synced metagraph for {netuid}.")
+                await logger.ainfo(f"Successfully synced metagraph for {netuid}.")
                 
                 state = None
                 with self.lock:
@@ -89,7 +91,7 @@ class MetagraphSyncer:
 
                 self._notify_listeners(state, netuid)
             except (BaseException, Exception) as e:
-                print(f"Error when syncing metagraph for {netuid}: {e}. Retrying in 60 seconds.")
+                await logger.aexception(f"Error when syncing metagraph for {netuid}: {e}. Retrying in 60 seconds.")
                 await asyncio.sleep(60)
 
     async def _run_async(self):
@@ -106,9 +108,9 @@ class MetagraphSyncer:
         try:
             asyncio.run(self._run_async())
         except Exception as e:
-            print(f"Error in MetagraphSyncer _run: {str(e)}")
+            logger.exception(f"Error in MetagraphSyncer _run: {str(e)}")
         finally:
-            print("MetagraphSyncer _run complete.")
+            logger.info("MetagraphSyncer _run complete.")
 
     def register_listener(
         self, listener: Callable[[bt.metagraph, int], None], netuids: List[int]
@@ -142,15 +144,15 @@ class MetagraphSyncer:
 
     def _notify_listeners(self, state: _State, netuid: int):
         """Notifies listeners of a new metagraph for netuid."""
-        print(f"Notifying listeners of update to metagraph for {netuid}.")
+        logger.info(f"Notifying listeners of update to metagraph for {netuid}.")
 
         for listener in state.listeners:
             try:
                 listener(state.metagraph, netuid)
             except Exception:
-                print(f"Exception caught notifying {netuid} listener of metagraph update.\n{traceback.format_exc()}")
+                logger.exception(f"Exception caught notifying {netuid} listener of metagraph update.\n{traceback.format_exc()}")
 
     def stop(self):
         """Stop the metagraph syncer"""
         self.is_running = False
-        print("MetagraphSyncer stopped.")
+        logger.info("MetagraphSyncer stopped.")

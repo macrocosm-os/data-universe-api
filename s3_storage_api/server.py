@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+import structlog
 
 from s3_storage_api.deps import get_metagraph_syncer, get_subtensor
 from s3_storage_api.middleware import RequestLoggingMiddleware
@@ -46,7 +47,7 @@ S3_OPERATION_TIMEOUT = 180  # 1 minute
 
 # Simple logging setup
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 app = FastAPI(
     title="S3 Auth Server for Data Universe - 2min Timeout",
@@ -1008,5 +1009,5 @@ if __name__ == "__main__":
         loop="asyncio",
         timeout_keep_alive=180,
         timeout_graceful_shutdown=30,
-        access_log=False
+        access_log=False,
     )

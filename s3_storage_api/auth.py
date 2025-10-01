@@ -5,7 +5,7 @@ import uuid
 from fastapi import Depends, HTTPException, Header, Request, status
 from cachetools import TTLCache
 from pydantic import BaseModel
-from substrateinterface import Keypair
+from substrateinterface.keypair import Keypair
 import bittensor as bt
 
 from s3_storage_api.deps import get_metagraph

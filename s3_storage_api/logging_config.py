@@ -49,7 +49,7 @@ def configure_logging(dev: bool = False) -> None:
     structlog.configure(
         processors=_shared_processors(dev),
         context_class=dict,                     
-        logger_factory=structlog.stdlib.LoggerFactory(),
+        logger_factory=structlog.PrintLoggerFactory(), 
         wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
         cache_logger_on_first_use=True,
     )
