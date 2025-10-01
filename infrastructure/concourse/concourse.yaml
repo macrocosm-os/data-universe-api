@@ -1,0 +1,287 @@
+resource_types:
+  - name: slack-notification
+    type: docker-image
+    source:
+      repository: cfcommunity/slack-notification-resource
+      tag:        latest
+  - name: metadata
+    type: docker-image
+    source:
+      repository: olhtbr/metadata-resource
+      tag: 2.0.1
+
+resources:
+  - name: deployment-notification-stage
+    type: slack-notification
+    source:
+      url: ((slack_webhook_stage))
+
+  - name: deployment-notification-prod
+    type: slack-notification
+    source:
+      url: ((slack_webhook_prod))
+
+  - name: service_repo_prod
+    type: git
+    check_every: 10m
+    source:
+      uri: https://github.com/macrocosm-os/data-universe-api.git
+      branch: main
+      depth: 1
+      username: ((ghcr_username))
+      password: ((ghcr_token))
+
+  - name: service_repo_stage
+    type: git
+    check_every: 10m
+    source:
+      uri: https://github.com/macrocosm-os/data-universe-api.git
+      branch: on-demand/scalable
+      depth: 1
+      username: ((ghcr_username))
+      password: ((ghcr_token))
+
+  - name: metadata
+    type: metadata
+
+  - name: concourse
+    type: docker-image
+    check_every: 10m
+    source:
+      repository: ghcr.io/macrocosm-os/concourse
+      tag: base_0.0.1
+      username: ((ghcr_username))
+      password: ((ghcr_token))
+
+jobs:
+  - name: start-deploy-stage
+    plan:
+      - get: concourse
+      - get: service_repo_stage
+        # trigger: true
+      
+      - task: get-version 
+        image: concourse
+        input_mapping:
+          service_repo: service_repo_stage
+        config:
+          platform: linux
+          inputs:
+            - name: service_repo
+          outputs:
+            - name: git-version
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                set -e
+                cd service_repo
+                git rev-parse --short=7 HEAD > ../git-version/git_version
+      
+      - put: deployment-notification-stage
+        params:
+          channel: '#concourse_deployments_stage'
+          text_file: git-version/git_version
+          text: |
+            :rocket: Deploying *((SERVICE))* service version `$TEXT_FILE_CONTENT` in *stage*
+
+  - name: deploy-service-stage
+    serial: true
+    on_failure:
+      put: deployment-notification-stage
+      params:
+        channel: '#concourse_deployments_stage'
+        text_file: git-version/git_version
+        text: |
+          :x: *((SERVICE))* service deployment failed for version `$TEXT_FILE_CONTENT` in *stage*
+    on_success:
+      put: deployment-notification-stage
+      params:
+        channel: '#concourse_deployments_stage'
+        text_file: git-version/git_version
+        text: |
+          :white_check_mark: *((SERVICE))* service deployed successfully for version `$TEXT_FILE_CONTENT` in *stage*
+    plan:
+      - get: concourse
+      - put: metadata
+
+      - get: service_repo_stage
+        trigger: true
+        passed:
+          - start-deploy-stage
+
+      - task: deploy-service-stage
+        image: concourse
+        input_mapping:
+          service_repo: service_repo_stage
+          metadata: metadata
+        config:
+          platform: linux
+          params:
+            KBCTLCFG: ((kubeconfig))
+            ENV_DIR: branch-main
+          inputs:
+            - name: service_repo
+            - name: metadata
+          outputs:
+            - name: git-version
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                set -e
+
+                JOB_RUN_ID=$(cat metadata/build_name)
+                
+                echo "[*] creating ~/.kube directory"
+                mkdir -p /root/.kube
+                
+                echo "[*] creating config"
+                echo -n "${KBCTLCFG}" > /root/.kube/config
+
+
+                echo "[*] Fetching main revision"
+                cd service_repo
+                GIT_HASH=`git rev-parse --short=7 HEAD`
+                echo "[+] Found revision ${GIT_HASH}"
+                echo "${GIT_HASH}" > ../git-version/git_version
+                
+                export IMAGE_TAG="${GIT_HASH}"
+                echo "[*] Depolying ((SERVICE)) with tag ${IMAGE_TAG}"
+                cd infrastructure/kubernetes-manifests/envs/${ENV_DIR}
+
+                sed -i -e "s/NEWTAGREPLACEME/${IMAGE_TAG}/g" kustomization.yaml
+                echo "[+] creating kustomization.yaml:"
+                cat kustomization.yaml
+                kubectl kustomize . > stack.yaml
+
+                echo ""
+                echo ""
+                echo "[+] deploying"
+                echo ""
+                echo ""
+
+                kubectl apply -f stack.yaml
+                kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
+      
+  - name: start-deploy-prod
+    plan:
+      - get: concourse
+      - get: service_repo_prod
+        trigger: false
+      - task: get-version 
+        image: concourse
+        config:
+          platform: linux
+          inputs:
+            - name: service_repo
+          outputs:
+            - name: git-version
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                set -e
+                cd service_repo
+                git rev-parse --short=7 HEAD > ../git-version/git_version
+      
+      - put: deployment-notification-prod
+        params:
+          channel: '#concourse_deployments_prod'
+          text_file: git-version/git_version
+          text: |
+            :rocket: Deploying *((SERVICE))* service version `$TEXT_FILE_CONTENT` in *prod*
+
+  - name: deploy-service-prod
+    serial: true
+    on_failure:
+      put: deployment-notification-prod
+      params:
+        channel: '#concourse_deployments_prod'
+        text_file: git-version/git_version
+        text: |
+          :x: *((SERVICE))* service deployment failed for version `$TEXT_FILE_CONTENT` in *prod*
+    on_success:
+      put: deployment-notification-prod
+      params:
+        channel: '#concourse_deployments_prod'
+        text_file: git-version/git_version
+        text: |
+          :white_check_mark: *((SERVICE))* service deployed successfully for version `$TEXT_FILE_CONTENT` in *prod*
+    plan:
+      - get: concourse
+
+      - get: service_repo_prod
+        trigger: true
+        passed:
+          - start-deploy-prod
+
+      - task: deploy-service-prod
+        image: concourse
+        input_mapping:
+          service_repo: service_repo_prod
+        config:
+          platform: linux
+          params:
+            KBCTLCFG: ((kubeconfig))
+            ENV_DIR: prod
+          inputs:
+            - name: service_repo
+          outputs:
+            - name: git-version
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                set -e
+                
+                echo "[*] creating ~/.kube directory"
+                mkdir -p /root/.kube
+                
+                echo "[*] creating config"
+                echo -n "${KBCTLCFG}" > /root/.kube/config
+
+
+                echo "[*] Fetching main revision"
+                cd service_repo
+                GIT_HASH=`git rev-parse --short=7 HEAD`
+                echo "[+] Found revision ${GIT_HASH}"
+                echo "${GIT_HASH}" > ../git-version/git_version
+                
+                export IMAGE_TAG="${GIT_HASH}"
+                echo "[*] Depolying ((SERVICE)) with tag ${IMAGE_TAG}"
+                cd infrastructure/kubernetes-manifests/envs/${ENV_DIR}
+
+                sed -i -e "s/NEWTAGREPLACEME/${IMAGE_TAG}/g" kustomization.yaml
+                echo "[+] creating kustomization.yaml:"
+                cat kustomization.yaml
+                kubectl kustomize . > stack.yaml
+
+                echo ""
+                echo ""
+                echo "[+] deploying"
+                echo ""
+                echo ""
+
+                kubectl apply -f stack.yaml
+                # kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
+
+groups:
+  - name: ((SERVICE))
+    jobs: 
+      - start-deploy-stage
+      - deploy-service-stage
+      - start-deploy-prod
+      - deploy-service-prod
+  - name: stage
+    jobs:
+      - start-deploy-stage
+      - deploy-service-stage
+  - name: prod
+    jobs:
+      - start-deploy-prod
+      - deploy-service-prod
