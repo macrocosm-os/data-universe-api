@@ -24,6 +24,10 @@ from s3_storage_api.utils.bt_utils_cached import (
 from s3_storage_api.routes.on_demand import router as on_demand_router
 
 from s3_storage_api.logging_config import configure_logging
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from prometheus_client import make_asgi_app
+from starlette.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 configure_logging()
 
@@ -59,6 +63,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestLoggingMiddleware)
+
+metrics_app = make_asgi_app()
+
+
+@app.get("/metrics")
+async def metrics(request: Request):
+    if request.headers.get("X-API-Key") != settings.metrics_api_key:
+        raise HTTPException(status_code=403)
+
+    return await metrics_app(request.scope, request.receive, request._send)
+
+
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
 
 redis_client = RedisClient()
 

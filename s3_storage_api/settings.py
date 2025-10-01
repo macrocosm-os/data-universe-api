@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ApiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="")
 
-
     constellation_api_key: str = "constellation_api_key"
 
     bittensor_network: str = Field(
@@ -38,6 +37,8 @@ class ApiSettings(BaseSettings):
     api_port: int = Field(8051, alias='PORT')
 
     postgres_dsn: str = "postgresql+asyncpg://user:pass@localhost:5432/mydb"
+
+    metrics_api_key: str = "metrics_api_key"
 
 
 settings = ApiSettings()
