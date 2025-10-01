@@ -65,7 +65,7 @@ services:
       /bin/sh -c "
       set -euo pipefail;
       mc alias set --insecure local https://minio:9000 ${DO_SPACES_KEY:-aws_access_key} ${DO_SPACES_SECRET:-aws_secret_key};
-      mc mb --ignore-existing local/${S3_BUCKET:-data-universe-storage};
+      mc mb --insecure --ignore-existing local/${S3_BUCKET:-data-universe-storage};
       echo 'Bucket ensured';
       "
     restart: "no"
