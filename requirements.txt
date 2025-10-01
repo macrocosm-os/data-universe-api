@@ -7,13 +7,13 @@ requests>=2.31.0
 pyarrow>=14.0.0  # For parquet support
 pydantic>=2.0.0
 bittensor==9.0.0
-dotenv
-redis
-pydantic
-pydantic_settings
-substrate-interface
-cachetools
-sqlalchemy
-alembic
-aiobotocore
-asyncpg
+dotenv==0.9.9
+redis==6.4.0
+pydantic==2.11.9
+pydantic-settings==2.11.0
+async-substrate-interface==1.5.4
+cachetools==6.2.0
+sqlalchemy==2.0.43
+alembic==1.16.5
+aiobotocore==2.24.0
+asyncpg==0.30.0

@@ -1,4 +1,4 @@
-httpx
-pytest
-pytest-asyncio
-greenlet
+httpx==0.28.1
+pytest==8.4.2
+pytest-asyncio==1.2.0
+greenlet==3.2.4
