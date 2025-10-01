@@ -5,6 +5,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY alembic.ini alembic.ini
+COPY alembic/ ./alembic/
 COPY s3_storage_api/ ./s3_storage_api/
 
 # Use ARG for build-time variables
