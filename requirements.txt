@@ -17,4 +17,4 @@ sqlalchemy==2.0.43
 alembic==1.16.5
 aiobotocore==2.24.0
 asyncpg==0.30.0
-structlog-25.4.0
+structlog==25.4.0
