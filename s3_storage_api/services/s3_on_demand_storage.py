@@ -33,14 +33,14 @@ class S3OnDemandStorage:
         if not self.endpoint_url:
             return True
 
-        return 'https' in self.endpoint_url
-    
+        return "https" in self.endpoint_url
+
     @property
     def _verify(self) -> bool:
         if not self.endpoint_url:
             return True
-        
-        return 'localhost' not in self.endpoint_url
+
+        return "localhost" not in self.endpoint_url
 
     async def presign_put(
         self, key: str, content_type: str = "application/json"
@@ -52,7 +52,7 @@ class S3OnDemandStorage:
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
             verify=self._verify,
-            use_ssl=self._is_https
+            use_ssl=self._is_https,
         ) as s3:
             url = await _maybe_await(
                 s3.generate_presigned_url(
@@ -75,7 +75,7 @@ class S3OnDemandStorage:
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
             verify=self._verify,
-            use_ssl=self._is_https
+            use_ssl=self._is_https,
         ) as s3:
             url = await _maybe_await(
                 s3.generate_presigned_url(
@@ -97,7 +97,7 @@ class S3OnDemandStorage:
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
             verify=self._verify,
-            use_ssl=self._is_https
+            use_ssl=self._is_https,
         ) as s3:
             try:
                 await s3.head_object(Bucket=self.bucket, Key=key)
@@ -124,7 +124,7 @@ class S3OnDemandStorage:
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
             verify=self._verify,
-            use_ssl=self._is_https
+            use_ssl=self._is_https,
         ) as s3:
             out: Dict[str, str] = {}
             # No threads; this is CPU/crypto-only and cheap—handle async/sync uniformly.
@@ -160,8 +160,9 @@ class S3OnDemandStorage:
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
             verify=self._verify,
-            use_ssl=self._is_https
+            use_ssl=self._is_https,
         ) as s3:
+
             async def _head(k: str) -> bool:
                 async with semaphore:
                     try:
@@ -184,3 +185,23 @@ class S3OnDemandStorage:
         date_part = dt.strftime("%Y-%m-%d")
         hour_part = dt.strftime("%H")
         return f"on-demand-jobs/date={date_part}/hour={hour_part}/job_id={job_id}/{miner_hotkey}.json"
+
+    async def readyz(self) -> bool:
+        try:
+            async with get_session().create_client(
+                "s3",
+                region_name=self.region,
+                endpoint_url=self.endpoint_url,
+                aws_access_key_id=self.aws_access_key,
+                aws_secret_access_key=self.aws_secret_key,
+                verify=self._verify,
+                use_ssl=self._is_https,
+            ) as s3:
+                await s3.head_bucket(Bucket=self.bucket)
+                return True
+        except ClientError as e:
+            # Common cases: 403 (no access), 404/NoSuchBucket (missing bucket), 301 (wrong region)
+            return False
+        except Exception:
+            # Network, DNS, TLS, or other unexpected issues
+            return False

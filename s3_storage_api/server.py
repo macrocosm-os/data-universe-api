@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple, List
 
 import boto3
 from botocore.config import Config
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -26,8 +26,7 @@ from s3_storage_api.routes.on_demand import router as on_demand_router
 from s3_storage_api.logging_config import configure_logging
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
-from starlette.responses import Response
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from s3_storage_api import deps
 
 configure_logging()
 
@@ -73,6 +72,39 @@ async def metrics(request: Request):
         raise HTTPException(status_code=403)
 
     return await metrics_app(request.scope, request.receive, request._send)
+
+
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz():
+    tasks = [
+        deps.get_rate_limiter().readyz(),
+        deps.get_s3_on_demand_storage().readyz(),
+        deps.readyz_pg(),
+        deps.get_metagraph_syncer().readyz(),
+    ]
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    checks = {
+        "redis": results[0] if not isinstance(results[0], Exception) else False,
+        "s3":    results[1] if not isinstance(results[1], Exception) else False,
+        "pg":    results[2] if not isinstance(results[2], Exception) else False,
+        "metagraph": results[3] if not isinstance(results[3], Exception) else False,
+    }
+
+    all_ok = all(v is True for v in checks.values())
+
+    return Response(
+        status_code=200 if all_ok else 503,
+        content={"status": "ok" if all_ok else "degraded", "checks": checks}.__str__()
+    )
+
+    
 
 redis_client = RedisClient()
 

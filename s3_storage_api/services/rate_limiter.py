@@ -21,6 +21,14 @@ class RateLimiter(ABC):
         """
         ...
 
+    @abstractmethod
+    async def readyz(self) -> bool:
+        """
+        Read-only health check. Returns True iff the limiter's backend is reachable
+        and ready to serve requests.
+        """
+        ...
+
 
 class NoRateLimiter(RateLimiter):
     """
@@ -32,6 +40,9 @@ class NoRateLimiter(RateLimiter):
         return True
 
     async def check(self, key: str, op: str, *, limit: int) -> bool:
+        return True
+
+    async def readyz(self) -> bool:
         return True
 
 
@@ -59,7 +70,9 @@ class RedisRateLimiter(RateLimiter):
     return c
     """
 
-    def __init__(self, client: redis.Redis, *, prefix: str = "data-universe-api") -> None:
+    def __init__(
+        self, client: redis.Redis, *, prefix: str = "data-universe-api"
+    ) -> None:
         self.client = client
         self.prefix = prefix
 
@@ -84,3 +97,12 @@ class RedisRateLimiter(RateLimiter):
         raw = await self.client.get(rkey)
         count = int(raw) if raw is not None else 0
         return count < int(limit)
+
+    async def readyz(self) -> bool:
+        try:
+            # redis.asyncio exposes `ping()` as an async method.
+            pong = await self.client.ping()
+            # Some Redis clients return True, others return b'PONG'
+            return bool(pong)
+        except Exception:
+            return False

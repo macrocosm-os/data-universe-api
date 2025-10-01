@@ -2,12 +2,10 @@ import asyncio
 import dataclasses
 from dataclasses import field
 from datetime import datetime
-import functools
 import bittensor as bt
 from typing import Dict, List, Callable, Optional
 import threading
 import traceback
-import time
 
 
 class MetagraphSyncer:
@@ -57,6 +55,9 @@ class MetagraphSyncer:
                 raise
 
         self.done_initial_sync = True
+
+    async def readyz(self) -> bool:
+        return self.done_initial_sync
 
     def start(self):
         print("Metagraph syncer start called")
