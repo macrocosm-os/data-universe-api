@@ -72,10 +72,10 @@ spec:
             cpu: "100m"
         readinessProbe:
           httpGet:
-            path: /healthcheck
+            path: /readyz
             port: 8000
         livenessProbe:
           httpGet:
-            path: /healthcheck
+            path: /healthz
             port: 8000
         name: data-universe-api
