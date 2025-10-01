@@ -57,7 +57,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,7 +89,7 @@ async def readyz():
         deps.get_metagraph_syncer().readyz(),
     ]
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks)
 
     checks = {
         "redis": results[0] if not isinstance(results[0], Exception) else False,

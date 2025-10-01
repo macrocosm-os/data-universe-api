@@ -54,6 +54,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
 
         # Access log
+
         duration_ms = round((time.perf_counter() - start) * 1000.0, 2)
         await logger.ainfo("http_request", status_code=response.status_code, duration_ms=duration_ms)
 
