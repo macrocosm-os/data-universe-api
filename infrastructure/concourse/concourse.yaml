@@ -23,7 +23,7 @@ resources:
 
   - name: service_repo_prod
     type: git
-    check_every: 10m
+    check_every: 2m
     source:
       uri: https://github.com/macrocosm-os/data-universe-api.git
       branch: main
@@ -33,7 +33,7 @@ resources:
 
   - name: service_repo_stage
     type: git
-    check_every: 10m
+    check_every: 2m
     source:
       uri: https://github.com/macrocosm-os/data-universe-api.git
       branch: on-demand/scalable
