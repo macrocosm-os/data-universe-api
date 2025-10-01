@@ -35,8 +35,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-              ${{ vars.REGISTRY }}/${{ vars.IMAGE_NAME }}
-            # ghcr.io/${{ github.repository_owner }}/${{ vars.IMAGE_NAME }}
+              # ${{ vars.REGISTRY }}/${{ vars.IMAGE_NAME }}
+              ghcr.io/${{ github.repository_owner }}/${{ vars.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
