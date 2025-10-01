@@ -1,5 +1,9 @@
 # S3 Storage for Data Universe with Folder-Based Access
 
+```
+https://data-universe-api.api.macrocosmos.ai
+```
+
 This module provides S3 compatibility for the Data Universe subnet, allowing miners to upload data directly to S3 storage instead of (or alongside) HuggingFace. The implementation includes blockchain-based authentication and folder-based access for efficient uploads and downloads.
 
 ## Features
@@ -160,3 +164,8 @@ pytest tests/ -s
 ```
 
 For migrations, there's alembic.
+
+```
+export POSTGRES_DSN=postgresql+asyncpg://user:pass@localhost:5432/mydb
+alembic upgrade head
+```
