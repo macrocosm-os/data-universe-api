@@ -187,21 +187,15 @@ class S3OnDemandStorage:
         return f"on-demand-jobs/date={date_part}/hour={hour_part}/job_id={job_id}/{miner_hotkey}.json"
 
     async def readyz(self) -> bool:
-        try:
-            async with get_session().create_client(
-                "s3",
-                region_name=self.region,
-                endpoint_url=self.endpoint_url,
-                aws_access_key_id=self.aws_access_key,
-                aws_secret_access_key=self.aws_secret_key,
-                verify=self._verify,
-                use_ssl=self._is_https,
-            ) as s3:
-                await s3.head_bucket(Bucket=self.bucket)
-                return True
-        except ClientError as e:
-            # Common cases: 403 (no access), 404/NoSuchBucket (missing bucket), 301 (wrong region)
-            return False
-        except Exception:
-            # Network, DNS, TLS, or other unexpected issues
-            return False
+        async with get_session().create_client(
+            "s3",
+            region_name=self.region,
+            endpoint_url=self.endpoint_url,
+            aws_access_key_id=self.aws_access_key,
+            aws_secret_access_key=self.aws_secret_key,
+            verify=self._verify,
+            use_ssl=self._is_https,
+        ) as s3:
+            await s3.head_bucket(Bucket=self.bucket)
+            return True
+

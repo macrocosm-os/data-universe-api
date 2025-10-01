@@ -99,10 +99,5 @@ class RedisRateLimiter(RateLimiter):
         return count < int(limit)
 
     async def readyz(self) -> bool:
-        try:
-            # redis.asyncio exposes `ping()` as an async method.
-            pong = await self.client.ping()
-            # Some Redis clients return True, others return b'PONG'
-            return bool(pong)
-        except Exception:
-            return False
+        _pong = await self.client.ping()
+        return True
