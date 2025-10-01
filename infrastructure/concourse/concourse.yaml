@@ -58,7 +58,7 @@ jobs:
     plan:
       - get: concourse
       - get: service_repo_stage
-        # trigger: true
+        trigger: true
       
       - task: get-version 
         image: concourse
@@ -113,6 +113,7 @@ jobs:
 
       - task: deploy-service-stage
         image: concourse
+        attempts: 3
         input_mapping:
           service_repo: service_repo_stage
           metadata: metadata
