@@ -15,3 +15,8 @@ spec:
       path: /metrics
       interval: 15s
       scrapeTimeout: 10s
+      authorization:
+        type: Bearer
+        credentials:
+          name: secrets
+          key: METRICS_API_KEY
