@@ -74,12 +74,6 @@ async def metrics(request: Request):
 
     return await metrics_app(request.scope, request.receive, request._send)
 
-
-@app.get("/healthz")
-async def healthz():
-    return {"status": "ok"}
-
-
 redis_client = RedisClient()
 
 # Initialize MetagraphSyncer for cached blockchain queries
