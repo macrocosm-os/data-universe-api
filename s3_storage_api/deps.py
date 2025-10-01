@@ -18,9 +18,9 @@ from s3_storage_api.services.db_and_s3_on_demand_jobs_service import (
     DBAndS3OnDemandJobsService,
 )
 import bittensor as bt
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _subtensor: bt.subtensor = None
 _metagraph_syncer: MetagraphSyncer = None
@@ -44,9 +44,6 @@ def get_metagraph_syncer() -> MetagraphSyncer:
         )
         _metagraph_syncer.do_initial_sync()
         _metagraph_syncer.start()
-        logger.info(
-            f"MetagraphSyncer initialized successfully for netuid {settings.netuid}"
-        )
 
     return _metagraph_syncer
 

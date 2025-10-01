@@ -11,6 +11,33 @@ import bittensor as bt
 from s3_storage_api.deps import get_metagraph
 from s3_storage_api.settings import settings
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+
+def _bind_entry_context(
+    request: Request,
+    role: str,
+    x_signed_by: str | None = None,
+    x_nonce: str | None = None,
+    x_ts: str | int | None = None,
+    x_version: str | None = None,
+):
+    structlog.contextvars.bind_contextvars(
+        role=role,
+        method=request.method,
+        path=request.url.path,
+        request_id=request.headers.get("x-request-id")
+        or request.headers.get("x-correlation-id"),
+        tao_version=x_version,
+        signed_by=x_signed_by,
+        nonce=x_nonce,
+        ts=x_ts,
+        client_ip=(request.client.host if request.client else None),
+        user_agent=request.headers.get("user-agent"),
+    )
+
 
 def _http_unauth(detail: str, code=status.HTTP_401_UNAUTHORIZED):
     raise HTTPException(status_code=code, detail=detail)
@@ -50,66 +77,89 @@ async def verify_bittensor_miner(
     x_sig: str = Header(..., alias="X-Tao-Signature"),
     metagraph: bt.Metagraph = Depends(get_metagraph),
 ) -> BittensorMinerAuth:
+    _bind_entry_context(
+        request,
+        role="miner",
+        x_signed_by=x_signed_by,
+        x_nonce=x_nonce,
+        x_ts=x_ts,
+        x_version=x_version,
+    )
 
-    # Version
     if x_version != "2":
+        await logger.awarning("auth_version_unsupported")
         _http_unauth("Unsupported X-Tao-Version")
 
-    # Timestamp sanity + skew window
     try:
         ts = int(x_ts)
     except Exception:
+        await logger.awarning("auth_timestamp_invalid")
         _http_unauth("Invalid timestamp", status.HTTP_400_BAD_REQUEST)
+
     now_ms = round(time.time() * 1000)
     if ts + settings.allowed_clock_skew_ms < now_ms:
+        await logger.awarning(
+            "auth_request_too_old",
+            now_ms=now_ms,
+            allowed_skew_ms=settings.allowed_clock_skew_ms,
+        )
         _http_unauth("Request too old", status.HTTP_400_BAD_REQUEST)
 
-    # Nonce replay
+    # Nonce checks
     try:
         uuid.UUID(x_nonce)
     except Exception:
+        await logger.awarning("auth_nonce_invalid")
         _http_unauth("Invalid nonce", status.HTTP_400_BAD_REQUEST)
+
     if x_nonce in _nonce_cache:
+        await logger.awarning("auth_replay_detected")
         _http_unauth("Replay detected", status.HTTP_400_BAD_REQUEST)
+
     _nonce_cache[x_nonce] = True
 
-    # Signature check (message = sha256(body) . nonce . timestamp)
+    # Signature
     body = await request.body()
-    message = f"{sha256(body).hexdigest()}.{x_nonce}.{ts}"
+    body_sha = sha256(body).hexdigest()
+    message = f"{body_sha}.{x_nonce}.{ts}"
 
     try:
         kp = Keypair(ss58_address=x_signed_by)
-
-        # Accept base64 or hex for convenience:
         try:
             sig_bytes = base64.b64decode(x_sig, validate=True)
         except Exception:
-            # fallback: hex
             sig_bytes = bytes.fromhex(x_sig)
-
         ok = kp.verify(message, sig_bytes)
     except Exception:
+        await logger.aexception("auth_sig_verify_error")
         _http_unauth("Signature verification error", status.HTTP_400_BAD_REQUEST)
 
     if not ok:
+        await logger.awarning("auth_sig_mismatch", body_sha=body_sha)
         _http_unauth("Signature mismatch")
 
-    # Chain check: only active MINERS on subnet 13 (not validators)
+    # Metagraph identity
     try:
         uid = list(metagraph.hotkeys).index(x_signed_by)
     except ValueError:
+        await logger.awarning(
+            "auth_hotkey_not_found",
+            netuid=settings.netuid,
+            network=settings.bittensor_network,
+        )
         _http_unauth(
             f"Hotkey {x_signed_by} not found on netuid {settings.netuid} ({settings.bittensor_network})."
         )
 
     is_active_miner = x_signed_by in metagraph.hotkeys
     if not is_active_miner:
+        await logger.awarning("auth_hotkey_not_active_miner")
         _http_unauth("Hotkey is not an active miner on this subnet")
 
-    # todo: rename
     incentive = float(metagraph.I[uid])
 
-    # success: return metadata for downstream handlers if needed
+    structlog.contextvars.bind_contextvars(miner_uid=uid, miner_incentive=incentive)
+
     return BittensorMinerAuth(
         miner_hotkey=x_signed_by, miner_uid=uid, miner_incentive=incentive
     )
@@ -131,78 +181,74 @@ async def verify_bittensor_validator(
     Returns BittensorValidatorAuth on success; raises HTTPException otherwise.
     """
 
-    # Version
+    _bind_entry_context(request, role="validator", x_signed_by=x_signed_by, x_nonce=x_nonce, x_ts=x_ts, x_version=x_version)
+
     if x_version != "2":
+        await logger.awarning("auth_version_unsupported")
         _http_unauth("Unsupported X-Tao-Version")
 
-    # Timestamp sanity + skew window
     try:
         ts = int(x_ts)
     except Exception:
+        await logger.awarning("auth_timestamp_invalid")
         _http_unauth("Invalid timestamp", status.HTTP_400_BAD_REQUEST)
 
     now_ms = round(time.time() * 1000)
     if ts + settings.allowed_clock_skew_ms < now_ms:
+        await logger.awarning("auth_request_too_old", now_ms=now_ms, allowed_skew_ms=settings.allowed_clock_skew_ms)
         _http_unauth("Request too old", status.HTTP_400_BAD_REQUEST)
 
-    # Nonce replay
     try:
         uuid.UUID(x_nonce)
     except Exception:
+        await logger.awarning("auth_nonce_invalid")
         _http_unauth("Invalid nonce", status.HTTP_400_BAD_REQUEST)
 
     if x_nonce in _nonce_cache:
+        await logger.awarning("auth_replay_detected")
         _http_unauth("Replay detected", status.HTTP_400_BAD_REQUEST)
     _nonce_cache[x_nonce] = True
 
-    # Signature check (message = sha256(body) . nonce . timestamp)
     body = await request.body()
-    message = f"{sha256(body).hexdigest()}.{x_nonce}.{ts}"
+    body_sha = sha256(body).hexdigest()
+    message = f"{body_sha}.{x_nonce}.{ts}"
 
     try:
         kp = Keypair(ss58_address=x_signed_by)
-
-        # Accept base64 or hex for convenience:
         try:
             sig_bytes = base64.b64decode(x_sig, validate=True)
         except Exception:
-            # fallback: hex
             sig_bytes = bytes.fromhex(x_sig)
-
         ok = kp.verify(message, sig_bytes)
     except Exception:
+        await logger.aexception("auth_sig_verify_error")
         _http_unauth("Signature verification error", status.HTTP_400_BAD_REQUEST)
-        
+
     if not ok:
+        await logger.awarning("auth_sig_mismatch", body_sha=body_sha)
         _http_unauth("Signature mismatch")
 
-    # Metagraph checks: must be a known hotkey AND have validator permit on this subnet
     try:
         uid = list(metagraph.hotkeys).index(x_signed_by)
     except ValueError:
-        _http_unauth(
-            f"Hotkey {x_signed_by} not found on netuid {settings.netuid} ({settings.bittensor_network})."
-        )
+        await logger.awarning("auth_hotkey_not_found", netuid=settings.netuid, network=settings.bittensor_network)
+        _http_unauth(f"Hotkey {x_signed_by} not found on netuid {settings.netuid} ({settings.bittensor_network}).")
 
-    # Validator-only gate
     try:
         permit = bool(metagraph.validator_permit[uid])
     except Exception:
-        # Defensive: surface a clear server error if metagraph isn't shaped as expected
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Metagraph missing validator_permit; contact operator.",
-        )
+        await logger.aerror("auth_metagraph_shape_error")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Metagraph missing validator_permit; contact operator.")
 
     if not permit:
+        await logger.awarning("auth_validator_no_permit")
         _http_unauth("Hotkey is not a permitted validator on this subnet")
 
     stake = int(metagraph.alpha_stake[uid])
-    enough_stake = stake > settings.min_validator_stake
-    if not enough_stake:
+    structlog.contextvars.bind_contextvars(validator_uid=uid, validator_permit=permit, validator_stake=stake)
+
+    if stake <= settings.min_validator_stake:
+        await logger.awarning("auth_validator_low_stake", min_required=settings.min_validator_stake)
         _http_unauth("Hotkey does not have enough stake on this subnet")
 
-    # success: return metadata for downstream handlers if needed
-    return BittensorValidatorAuth(
-        validator_hotkey=x_signed_by, validator_uid=uid, permit=permit, stake=stake
-    )
+    return BittensorValidatorAuth(validator_hotkey=x_signed_by, validator_uid=uid, permit=permit, stake=stake)

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from s3_storage_api.deps import get_metagraph_syncer, get_subtensor
+from s3_storage_api.middleware import RequestLoggingMiddleware
 from s3_storage_api.utils.redis_utils import RedisClient
 from s3_storage_api.utils.bt_utils import verify_signature, verify_validator_status
 from s3_storage_api.utils.bt_utils_cached import (
@@ -21,6 +22,10 @@ from s3_storage_api.utils.bt_utils_cached import (
 )
 
 from s3_storage_api.routes.on_demand import router as on_demand_router
+
+from s3_storage_api.logging_config import configure_logging
+
+configure_logging()
 
 load_dotenv()
 
@@ -53,6 +58,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestLoggingMiddleware)
 
 redis_client = RedisClient()
 
@@ -273,7 +279,11 @@ def generate_validator_access_urls(
     # List all miners (hotkeys) (with data/ prefix)
     urls["miners"]["list_all_miners"] = s3_client.generate_presigned_url(
         "list_objects_v2",
-        Params={"Bucket": settings.s3_bucket, "Prefix": "data/hotkey=", "Delimiter": "/"},
+        Params={
+            "Bucket": settings.s3_bucket,
+            "Prefix": "data/hotkey=",
+            "Delimiter": "/",
+        },
         ExpiresIn=expiry_seconds,
     )
 
@@ -323,7 +333,9 @@ async def get_folder_access(request: MinerFolderAccessRequest):
             logger.warning(f"MINER SIGNATURE FAILED: {hotkey} (coldkey: {coldkey})")
             raise HTTPException(status_code=401, detail="Invalid signature")
 
-        policy = generate_folder_upload_policy(settings.s3_bucket, folder_path, expiry_hours=24)
+        policy = generate_folder_upload_policy(
+            settings.s3_bucket, folder_path, expiry_hours=24
+        )
         list_url = s3_client.generate_presigned_url(
             "list_objects_v2",
             Params={"Bucket": settings.s3_bucket, "Prefix": folder_path},
@@ -481,7 +493,10 @@ async def get_folder_presigned_urls(request: ValidatorAccessRequest):
                             # Generate presigned URL for this job folder
                             presigned_url = s3_client.generate_presigned_url(
                                 "list_objects_v2",
-                                Params={"Bucket": settings.s3_bucket, "Prefix": job_path},
+                                Params={
+                                    "Bucket": settings.s3_bucket,
+                                    "Prefix": job_path,
+                                },
                                 ExpiresIn=expiry_seconds,
                             )
 
