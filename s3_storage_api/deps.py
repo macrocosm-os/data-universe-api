@@ -102,10 +102,11 @@ def get_pg_async_session_factory() -> async_sessionmaker[AsyncSession]:
     return build_async_session_factory(dsn=settings.postgres_dsn)
 
 
-async def readyz_pg(session_factory: async_sessionmaker[AsyncSession]) -> bool:
+async def readyz_pg() -> bool:
     """
     Read-only readiness check for Postgres.
     """
+    session_factory = build_async_session_factory()
     try:
         async with session_factory() as session:
             await session.execute(text("SELECT 1"))
