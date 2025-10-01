@@ -13,4 +13,4 @@ COPY s3_storage_api/ ./s3_storage_api/
 
 ENV PORT=8000
 ENV HOST=0.0.0.0
-CMD ["sh", "-c", "alembic upgrade head && uvicorn s3_storage_api.main:app --host $HOST --port $PORT --access-log=False"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn s3_storage_api.main:app --host $HOST --port $PORT --no-access-log"]

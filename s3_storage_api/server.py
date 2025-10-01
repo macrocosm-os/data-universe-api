@@ -92,8 +92,8 @@ async def readyz():
 
     checks = {
         "redis": results[0] if not isinstance(results[0], Exception) else False,
-        "s3":    results[1] if not isinstance(results[1], Exception) else False,
-        "pg":    results[2] if not isinstance(results[2], Exception) else False,
+        "s3": results[1] if not isinstance(results[1], Exception) else False,
+        "pg": results[2] if not isinstance(results[2], Exception) else False,
         "metagraph": results[3] if not isinstance(results[3], Exception) else False,
     }
 
@@ -101,10 +101,9 @@ async def readyz():
 
     return Response(
         status_code=200 if all_ok else 503,
-        content={"status": "ok" if all_ok else "degraded", "checks": checks}.__str__()
+        content={"status": "ok" if all_ok else "degraded", "checks": checks}.__str__(),
     )
 
-    
 
 redis_client = RedisClient()
 
@@ -1009,4 +1008,5 @@ if __name__ == "__main__":
         loop="asyncio",
         timeout_keep_alive=180,
         timeout_graceful_shutdown=30,
+        access_log=False
     )
