@@ -42,7 +42,7 @@ spec:
             name: coldkeypub
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
+          # readOnlyRootFilesystem: true
           runAsNonRoot: false
         envFrom:
           - configMapRef:
