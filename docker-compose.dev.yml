@@ -69,7 +69,12 @@ services:
       echo 'Bucket ensured';
       "
     restart: "no"
-
+    healthcheck:
+      test: ["CMD-SHELL", "mc alias list | grep -q local && mc ls local/${S3_BUCKET:-data-universe-storage} >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 2s
 
 volumes:
   pgdata:
