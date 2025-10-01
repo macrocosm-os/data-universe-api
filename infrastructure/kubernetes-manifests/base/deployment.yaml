@@ -32,14 +32,14 @@ spec:
         - name: coldkeypub
           secret:
             secretName: secrets
+            items:
+              - key: COLDKEYPUB
+                path: coldkeypub.txt
       containers:
       - imagePullPolicy: Always
         volumeMounts:
           - mountPath: .bittensor/wallets/cfusion/coldkeypub.txt
             name: coldkeypub
-            items:
-              - key: COLDKEYPUB
-                path: coldkeypub.txt
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
