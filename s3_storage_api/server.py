@@ -78,8 +78,8 @@ async def metrics(request: Request):
     logger.info("incoming key")
     logger.info(request.headers.get("Authorization"))
     logger.info("expected key")
-    logger.info(f"Bearer  ${settings.metrics_api_key}")
-    if request.headers.get("Authorization") != f"Bearer  ${settings.metrics_api_key}":
+    logger.info(f"Bearer  {settings.metrics_api_key}")
+    if request.headers.get("Authorization") != f"Bearer  {settings.metrics_api_key}":
         raise HTTPException(status_code=401)
     
     # fastapi metrics + default process/GC metrics
