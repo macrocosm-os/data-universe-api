@@ -1,0 +1,232 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: macrocosmos-sn13-data-universe-api-branch-main
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: data-universe-api
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: data-universe-api
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: data-universe-api
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: data-universe-api
+subjects:
+- kind: ServiceAccount
+  name: data-universe-api
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+---
+apiVersion: v1
+data:
+  DUMMY: DUMMY
+  VERSION: sha-c68e61d
+kind: ConfigMap
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: config
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  labels:
+    app.kubernetes.io/name: data-universe-api
+    app.kubernetes.io/part-of: data-universe-api
+  name: data-universe-api
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+spec:
+  ports:
+  - name: service-port
+    port: 8000
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: data-universe-api
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  labels:
+    app.kubernetes.io/component: data-universe-api
+    app.kubernetes.io/instance: data-universe-api
+    app.kubernetes.io/name: data-universe-api
+    app.kubernetes.io/part-of: data-universe-api
+  name: data-universe-api
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: data-universe-api
+  template:
+    metadata:
+      annotations:
+        concourse.ci/job: deploy-service-branch-main
+        concourse.ci/pipeline: data-universe-api
+        git-version: sha-c68e61d
+      labels:
+        app.kubernetes.io/name: data-universe-api
+    spec:
+      containers:
+      - env:
+        - name: SERVICE
+          value: data-universe-api
+        - name: PORT
+          value: "8000"
+        - name: ENV
+          value: stage
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        envFrom:
+        - configMapRef:
+            name: config
+        - secretRef:
+            name: secrets
+        image: ghcr.io/macrocosm-os/macrocosm-os/data-universe-api:sha-c68e61d
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 8000
+        name: data-universe-api
+        ports:
+        - containerPort: 8000
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 8000
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: false
+      imagePullSecrets:
+      - name: ghcr-secret
+      securityContext:
+        fsGroup: 2000
+        runAsGroup: 1000
+        runAsUser: 1000
+      serviceAccountName: data-universe-api
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: application-secrets
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+spec:
+  dataFrom:
+  - extract:
+      key: DATA_UNIVERSE_API_SECRETS_BRANCH_MAIN
+  refreshInterval: 10m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: bitwarden-secretsmanager
+  target:
+    creationPolicy: Owner
+    name: secrets
+    template:
+      data:
+        POSTGRES_DSN: '{{ .POSTGRES_DSN }}'
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: org-user-ghcr-pull-secret
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+spec:
+  data:
+  - remoteRef:
+      key: GITHUB_REGISTRY_TOKEN
+    secretKey: GITHUB_REGISTRY_TOKEN
+  refreshInterval: 10m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: bitwarden-secretsmanager
+  target:
+    creationPolicy: Owner
+    name: ghcr-secret
+    template:
+      data:
+        .dockerconfigjson: '{{ .GITHUB_REGISTRY_TOKEN | toString }}'
+      type: kubernetes.io/dockerconfigjson
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    concourse.ci/job: deploy-service-branch-main
+    concourse.ci/pipeline: data-universe-api
+    git-version: sha-c68e61d
+  name: data-universe-api
+  namespace: macrocosmos-sn13-data-universe-api-branch-main
+spec:
+  ingressClassName: nginx-api
+  rules:
+  - host: data-universe-api-branch-main.api.macrocosmos.ai
+    http:
+      paths:
+      - backend:
+          service:
+            name: data-universe-api
+            port:
+              number: 8000
+        path: /
+        pathType: Exact

@@ -28,8 +28,18 @@ spec:
       serviceAccountName: data-universe-api
       imagePullSecrets:
         - name: ghcr-secret
+      volumes:
+        - name: coldkeypub
+          secret:
+            secretName: secrets
       containers:
       - imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: .bittensor/wallets/cfusion/coldkeypub.txt
+            name: coldkeypub
+            items:
+              - key: COLDKEYPUB
+                path: coldkeypub.txt
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
