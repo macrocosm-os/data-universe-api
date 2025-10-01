@@ -20,3 +20,4 @@ asyncpg==0.30.0
 structlog==25.4.0
 prometheus_client==0.23.1
 opentelemetry-instrumentation-fastapi==0.58b0
+prometheus_fastapi_instrumentator==7.1.0

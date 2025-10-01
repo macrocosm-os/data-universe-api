@@ -7,9 +7,7 @@ from datetime import datetime, timezone
 from typing import Callable, Dict, Iterable, Optional
 
 from botocore.exceptions import ClientError
-from aiobotocore.session import get_session, AioSession
-
-from s3_storage_api.settings import settings
+from aiobotocore.session import get_session
 
 
 async def _maybe_await(value):
