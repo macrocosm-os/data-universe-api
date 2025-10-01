@@ -38,7 +38,7 @@ spec:
       containers:
       - imagePullPolicy: Always
         volumeMounts:
-          - mountPath: .bittensor/wallets/cfusion/coldkeypub.txt
+          - mountPath: /.bittensor/wallets/cfusion/coldkeypub.txt
             name: coldkeypub
         securityContext:
           allowPrivilegeEscalation: false
