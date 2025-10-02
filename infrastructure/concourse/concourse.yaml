@@ -21,22 +21,12 @@ resources:
     source:
       url: ((slack_webhook_prod))
 
-  - name: service_repo_prod
+  - name: service_repo
     type: git
     check_every: 2m
     source:
       uri: https://github.com/macrocosm-os/data-universe-api.git
       branch: main
-      depth: 1
-      username: ((ghcr_username))
-      password: ((ghcr_token))
-
-  - name: service_repo_stage
-    type: git
-    check_every: 2m
-    source:
-      uri: https://github.com/macrocosm-os/data-universe-api.git
-      branch: on-demand/scalable
       depth: 1
       username: ((ghcr_username))
       password: ((ghcr_token))
@@ -57,13 +47,11 @@ jobs:
   - name: start-deploy-stage
     plan:
       - get: concourse
-      - get: service_repo_stage
+      - get: service_repo
         trigger: true
       
       - task: get-version 
         image: concourse
-        input_mapping:
-          service_repo: service_repo_stage
         config:
           platform: linux
           inputs:
@@ -106,7 +94,7 @@ jobs:
       - get: concourse
       - put: metadata
 
-      - get: service_repo_stage
+      - get: service_repo
         trigger: true
         passed:
           - start-deploy-stage
@@ -115,7 +103,6 @@ jobs:
         image: concourse
         attempts: 3
         input_mapping:
-          service_repo: service_repo_stage
           metadata: metadata
         config:
           platform: linux
@@ -169,8 +156,6 @@ jobs:
 
       - task: healthcheck-stage
         image: concourse
-        input_mapping:
-          service_repo: service_repo_stage
         config:
           platform: linux
           params:
@@ -202,7 +187,7 @@ jobs:
   - name: start-deploy-prod
     plan:
       - get: concourse
-      - get: service_repo_prod
+      - get: service_repo
         trigger: false
       - task: get-version 
         image: concourse
@@ -247,15 +232,13 @@ jobs:
     plan:
       - get: concourse
 
-      - get: service_repo_prod
+      - get: service_repo
         trigger: true
         passed:
           - start-deploy-prod
 
       - task: deploy-service-prod
         image: concourse
-        input_mapping:
-          service_repo: service_repo_prod
         config:
           platform: linux
           params:
@@ -305,8 +288,6 @@ jobs:
 
       - task: healthcheck-prod
         image: concourse
-        input_mapping:
-          service_repo: service_repo_prod
         config:
           platform: linux
           params:

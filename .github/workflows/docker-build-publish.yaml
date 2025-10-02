@@ -2,7 +2,7 @@ name: Docker Build and Publish
 
 on:
   push:
-    branches: [ main, dev, on-demand/scalable ]
+    branches: [main]
     tags:
       - 'v*'        # e.g. v1.2.3 will produce a semver tag
   workflow_dispatch:
