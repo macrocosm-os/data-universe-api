@@ -166,7 +166,39 @@ jobs:
 
                 kubectl apply -f stack.yaml
                 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
-      
+
+      - task: healthcheck-stage
+        image: concourse
+        input_mapping:
+          service_repo: service_repo_stage
+        config:
+          platform: linux
+          params:
+            ENV: stage
+            SERVICE_URL: data-universe-api-branch-main
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                RETRY_COUNT=0
+                RESPONSE="0"
+                while [ ${RETRY_COUNT} -le 15 ]
+                do
+                  echo "[*] Trying healthcheck, iteration ${RETRY_COUNT}"
+                  RESPONSE=`curl --silent --output out --write-out "%{http_code}" https://${SERVICE_URL}.api.macrocosmos.ai/healthcheck`
+                  echo "[*] got ${RESPONSE}, $(cat out)"
+                  if [ ${RESPONSE} -eq 200 ]; then
+                    echo "[+] healthcheck passed!"
+                    exit 0
+                  fi
+                  RETRY_COUNT=$(( $RETRY_COUNT + 1 ))
+                  sleep 5;
+                done
+                exit 1
+
+
+
   - name: start-deploy-prod
     plan:
       - get: concourse
@@ -270,6 +302,36 @@ jobs:
 
                 kubectl apply -f stack.yaml
                 # kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=data-universe-api -n macrocosmos-sn13-data-universe-api-${ENV_DIR} --timeout=120s
+
+      - task: healthcheck-prod
+        image: concourse
+        input_mapping:
+          service_repo: service_repo_prod
+        config:
+          platform: linux
+          params:
+            ENV: prod
+            SERVICE_URL: data-universe-api
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                RETRY_COUNT=0
+                RESPONSE="0"
+                while [ ${RETRY_COUNT} -le 15 ]
+                do
+                  echo "[*] Trying healthcheck, iteration ${RETRY_COUNT}"
+                  RESPONSE=`curl --silent --output out --write-out "%{http_code}" https://${SERVICE_URL}.api.macrocosmos.ai/healthcheck`
+                  echo "[*] got ${RESPONSE}, $(cat out)"
+                  if [ ${RESPONSE} -eq 200 ]; then
+                    echo "[+] healthcheck passed!"
+                    exit 0
+                  fi
+                  RETRY_COUNT=$(( $RETRY_COUNT + 1 ))
+                  sleep 5;
+                done
+                exit 1
 
 groups:
   - name: ((SERVICE))

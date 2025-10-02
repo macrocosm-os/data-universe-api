@@ -11,3 +11,4 @@ resources:
   - roles.yaml
   - service.yaml
   - serviceaccount.yaml
+  - service-monitor.yaml
