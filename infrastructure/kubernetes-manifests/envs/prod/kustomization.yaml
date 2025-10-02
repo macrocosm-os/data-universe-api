@@ -30,5 +30,5 @@ commonLabels:
   app: data-universe-api
 
 images:
-  - name: ghcr.io/macrocosm-os/data-universe-api:branch-main
+  - name: ghcr.io/macrocosm-os/macrocosm-os/data-universe-api:branch-main
     newTag: sha-NEWTAGREPLACEME
