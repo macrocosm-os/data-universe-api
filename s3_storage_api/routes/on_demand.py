@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import cast
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from s3_storage_api.auth import (

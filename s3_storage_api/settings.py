@@ -25,7 +25,6 @@ class ApiSettings(BaseSettings):
 
     disable_rate_limiting: bool = False
 
-
     s3_bucket : str = "data-universe-storage"
     s3_region: str = "nyc3"
     s3_endpoint: str = Field("https://localhost:9000", env="S3_ENDPOINT")

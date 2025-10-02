@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Dict, Tuple, List, Optional, Type, Union
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from s3_storage_api.db.on_demand_orm import OnDemandJobORM, OnDemandSubmissionORM
 from s3_storage_api.models.on_demand import (
@@ -16,6 +16,8 @@ from s3_storage_api.models.on_demand import (
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+import structlog
+logger = structlog.get_logger(__name__)
 
 PayloadModel = Union[
     OnDemandJobPayloadX, OnDemandJobPayloadReddit, OnDemandJobPayloadYoutube
@@ -57,7 +59,8 @@ class PayloadRegistry:
 
 def orm_on_demand_job_to_domain(orm: OnDemandJobORM) -> OnDemandJob:
     payload = PayloadRegistry.deserialize(orm.platform, orm.payload)
-    return OnDemandJob(
+
+    job = OnDemandJob.model_construct(
         id=orm.id,
         created_at=orm.created_at,
         expire_at=orm.expire_at,
@@ -67,12 +70,13 @@ def orm_on_demand_job_to_domain(orm: OnDemandJobORM) -> OnDemandJob:
         limit=orm.limit,
         keyword_mode=orm.keyword_mode,
     )
+    return job
 
 
 def orm_on_demand_submission_to_domain(
     orm: OnDemandSubmissionORM, presigned_url: str | None = None
 ) -> OnDemandJobSubmission:
-    return OnDemandJobSubmission(
+    return OnDemandJobSubmission.model_construct(
         job_id=orm.job_id,
         miner_hotkey=orm.miner_hotkey,
         miner_incentive=orm.miner_incentive,
@@ -103,6 +107,8 @@ class OnDemandJobRepository:
             s.add(obj)
             await s.commit()
 
+        await logger.ainfo("Inserted job", job_id=job.id)
+
     async def get(self, job_id: str) -> Optional[OnDemandJob]:
         async with self._session_factory() as s:
             res = await s.execute(
@@ -114,7 +120,7 @@ class OnDemandJobRepository:
     async def list_active(
         self, since: datetime, now: Optional[datetime] = None
     ) -> List[OnDemandJob]:
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(timezone.utc) + timedelta(seconds=10)
         async with self._session_factory() as s:
             res = await s.execute(
                 select(OnDemandJobORM)

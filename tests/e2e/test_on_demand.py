@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 import pytest
 from fastapi import FastAPI
-from substrateinterface import Keypair
+from substrateinterface.keypair import Keypair
 
 from s3_storage_api.routes.on_demand import router as on_demand_router
 from s3_storage_api.settings import settings
@@ -163,15 +163,14 @@ async def test_full_e2e_flow(client: httpx.AsyncClient, wallets):
         content=create_req.model_dump_json(),
         headers=headers_constellation,
     )
-    print(res_create.text)
     assert res_create.status_code == 201, res_create.text
     job_id = res_create.json()["job_id"]
-    assert job_id
+    print(f"Created job with id: {job_id}")
 
     #
     # 2) Miners poll active jobs
     #
-    list_req = ListActiveJobsRequest()
+    list_req = ListActiveJobsRequest(since=now - timedelta(seconds=5))
     body = list_req.model_dump_json().encode("utf-8")
     headers = sign_headers(miner1, body)
 
@@ -180,12 +179,12 @@ async def test_full_e2e_flow(client: httpx.AsyncClient, wallets):
         content=body,
         headers=headers,
     )
-    print(res.text)
     assert res.status_code == 200, res.text
     jobs_1 = res.json()["jobs"]
+    print(f"Miner 1 polled active jobs with ids: {[j["id"] for j in jobs_1]}")
     assert any(j["id"] == job_id for j in jobs_1)
 
-    list_req = ListActiveJobsRequest()
+    list_req = ListActiveJobsRequest(since=now - timedelta(seconds=5))
     body = list_req.model_dump_json().encode("utf-8")
     headers = sign_headers(miner2, body)
 
@@ -258,7 +257,7 @@ async def test_full_e2e_flow(client: httpx.AsyncClient, wallets):
     # 5) Wait for job to expire so validator endpoint includes it.
     # (validator list endpoint filters for expired jobs within a window.)
 
-    print('sleep 17')
+    print("sleep 17")
     await asyncio.sleep(17)
 
     #

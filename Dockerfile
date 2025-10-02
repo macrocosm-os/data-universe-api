@@ -9,8 +9,6 @@ COPY alembic.ini alembic.ini
 COPY alembic/ ./alembic/
 COPY s3_storage_api/ ./s3_storage_api/
 
-# Use ARG for build-time variables
-
 ENV PORT=8000
 ENV HOST=0.0.0.0
 CMD ["sh", "-c", "alembic upgrade head && uvicorn s3_storage_api.server:app --host $HOST --port $PORT --no-access-log"]
