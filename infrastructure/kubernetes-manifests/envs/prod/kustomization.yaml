@@ -9,6 +9,7 @@ resources:
   - ../../base
   - ingress.yaml
   - external-secret.yaml
+  - configmap.yaml
 
 # patch namespaces etc
 patches:

@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  BITTENSOR_NETWORK: testnet
+kind: ConfigMap
+metadata:
+  name: env-specific-config
+  namespace: kustomize-me

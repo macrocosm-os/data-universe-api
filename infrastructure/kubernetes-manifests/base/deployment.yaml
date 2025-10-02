@@ -47,6 +47,8 @@ spec:
         envFrom:
           - configMapRef:
               name: config
+          - configMapRef:
+              name: env-specific-config
           - secretRef:
               name: secrets
         env:
