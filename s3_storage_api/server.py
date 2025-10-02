@@ -46,7 +46,6 @@ VALIDATOR_VERIFICATION_TIMEOUT = 120  # 2 minutes
 SIGNATURE_VERIFICATION_TIMEOUT = 60  # 1 minute
 S3_OPERATION_TIMEOUT = 180  # 1 minute
 
-# Simple logging setup
 logging.basicConfig(level=logging.INFO)
 logger = structlog.get_logger(__name__)
 
@@ -67,13 +66,13 @@ app.add_middleware(RequestLoggingMiddleware)
 
 instrumentator = Instrumentator(
     should_instrument_requests_inprogress=True,
-    excluded_handlers={"/healthz", "/readyz"},
+    excluded_handlers={"/healthz", "/readyz", '/healthcheck'},
 )
 
 instrumentator.instrument(app)
 
 
-@app.get("/metrics")
+@app.get("/metrics", include_in_schema=False)
 async def metrics(request: Request):
     if request.headers.get("Authorization") != f"Bearer {settings.metrics_api_key}":
         raise HTTPException(status_code=401)
@@ -83,12 +82,12 @@ async def metrics(request: Request):
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
 
-@app.get("/healthz")
+@app.get("/healthz", include_in_schema=False)
 async def healthz():
     return {"status": "ok"}
 
 
-@app.get("/readyz")
+@app.get("/readyz", include_in_schema=False)
 async def readyz():
     tasks = [
         deps.get_rate_limiter().readyz(),
@@ -1013,7 +1012,7 @@ if __name__ == "__main__":
         host=settings.api_host,
         port=settings.api_port,
         reload=False,
-        workers=max(2, (os.cpu_count() or 2) // 2),  # e.g. 2–4
+        workers=1,
         loop="asyncio",
         timeout_keep_alive=180,
         timeout_graceful_shutdown=30,
