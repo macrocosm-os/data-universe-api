@@ -75,10 +75,6 @@ instrumentator.instrument(app)
 
 @app.get("/metrics")
 async def metrics(request: Request):
-    logger.info("incoming auth")
-    logger.info(request.headers.get("Authorization"))
-    logger.info("expected auth")
-    logger.info(f"Bearer {settings.metrics_api_key}")
     if request.headers.get("Authorization") != f"Bearer {settings.metrics_api_key}":
         raise HTTPException(status_code=401)
     
