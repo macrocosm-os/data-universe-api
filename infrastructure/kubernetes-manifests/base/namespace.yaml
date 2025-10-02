@@ -1,0 +1,6 @@
+---
+# creates the NS for the application
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kustomize-me

@@ -1,5 +1,9 @@
 # S3 Storage for Data Universe with Folder-Based Access
 
+```
+https://data-universe-api.api.macrocosmos.ai
+```
+
 This module provides S3 compatibility for the Data Universe subnet, allowing miners to upload data directly to S3 storage instead of (or alongside) HuggingFace. The implementation includes blockchain-based authentication and folder-based access for efficient uploads and downloads.
 
 ## Features
@@ -137,3 +141,31 @@ The recommended migration strategy:
 - Monitor for unusual access patterns
 - Regularly rotate AWS credentials
 - Use the smallest set of S3 permissions needed
+
+## Local Development & Testing
+
+Boot up the test containers:
+```
+docker compose --env-file .test.env -f docker-compose.dev.yml up
+```
+
+Tear them down (optional remove volumes with -v)
+```
+docker compose -f docker-compose.dev.yml down -v
+```
+
+Run tests
+
+```
+pip install -r requirements-dev.txt
+export PYTHONPATH=$(pwd)
+
+pytest tests/ -s
+```
+
+For migrations, there's alembic.
+
+```
+export POSTGRES_DSN=postgresql+asyncpg://user:pass@localhost:5432/mydb
+alembic upgrade head
+```

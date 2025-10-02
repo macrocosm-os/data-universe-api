@@ -1,0 +1,8 @@
+apiVersion: v1
+data:
+  REDIS_URL_OLD: redis://redis-cluster:6379/0
+  VERSION: REPLACEME
+kind: ConfigMap
+metadata:
+  name: config
+  namespace: kustomize-me

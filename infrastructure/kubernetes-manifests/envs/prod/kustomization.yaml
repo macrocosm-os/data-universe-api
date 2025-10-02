@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# update the namespace
+namespace: macrocosmos-sn13-data-universe-api-prod
+
+# include base resources
+resources:
+  - ../../base
+  - ingress.yaml
+  - external-secret.yaml
+  - configmap.yaml
+
+# patch namespaces etc
+patches:
+  # - path: netpol.yaml
+  - target:
+      version: v1
+      kind: ConfigMap
+      name: config
+    patch: |-
+      - op: replace
+        path: /data/VERSION
+        value: sha-NEWTAGREPLACEME
+      - op: replace
+        path: /data/env
+        value: prod
+
+commonLabels:
+  app: data-universe-api
+
+images:
+  - name: ghcr.io/macrocosm-os/data-universe-api:branch-main
+    newTag: sha-NEWTAGREPLACEME

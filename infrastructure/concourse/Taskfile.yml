@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list-all
+
+  login:
+    cmds:
+      - >
+        fly --target main login
+        --team-name main
+        --concourse-url http://concourse.neko-city.ts.net
+
+  set-pipeline:
+    cmds:
+      - >
+        fly -t main
+        set-pipeline
+        -c concourse.yaml
+        -p data-universe-api
+        --var SERVICE=data-universe-api

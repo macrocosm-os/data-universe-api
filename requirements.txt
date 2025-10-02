@@ -4,8 +4,20 @@ numpy>=1.24.0
 fastapi>=0.100.0
 uvicorn>=0.23.0
 requests>=2.31.0
-pyarrow>=14.0.0  # For parquet support
+pyarrow>=14.0.0
 pydantic>=2.0.0
 bittensor==9.0.0
-dotenv
-redis
+dotenv==0.9.9
+redis==6.4.0
+pydantic==2.11.9
+pydantic-settings==2.11.0
+substrate-interface==1.7.11
+cachetools==6.2.0
+sqlalchemy==2.0.43
+alembic==1.16.5
+aiobotocore==2.24.0
+asyncpg==0.30.0
+structlog==25.4.0
+prometheus_client==0.23.1
+opentelemetry-instrumentation-fastapi==0.58b0
+prometheus_fastapi_instrumentator==7.1.0
