@@ -112,5 +112,5 @@ class OnDemandJobSubmission(BaseModel):
     miner_hotkey: str = "will_be_auto_filled"
     miner_incentive: float = 0.0  # will_be_auto_filled
 
-    s3_path: str = "will_be_auto_filled"
+    s3_path: Optional[str] = None
     submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

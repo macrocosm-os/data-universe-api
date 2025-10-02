@@ -57,7 +57,7 @@ class PayloadRegistry:
 
 def orm_on_demand_job_to_domain(orm: OnDemandJobORM) -> OnDemandJob:
     payload = PayloadRegistry.deserialize(orm.platform, orm.payload)
-    return OnDemandJob.model_construct(
+    return OnDemandJob(
         id=orm.id,
         created_at=orm.created_at,
         expire_at=orm.expire_at,
@@ -72,7 +72,7 @@ def orm_on_demand_job_to_domain(orm: OnDemandJobORM) -> OnDemandJob:
 def orm_on_demand_submission_to_domain(
     orm: OnDemandSubmissionORM, presigned_url: str | None = None
 ) -> OnDemandJobSubmission:
-    return OnDemandJobSubmission.model_construct(
+    return OnDemandJobSubmission(
         job_id=orm.job_id,
         miner_hotkey=orm.miner_hotkey,
         miner_incentive=orm.miner_incentive,
